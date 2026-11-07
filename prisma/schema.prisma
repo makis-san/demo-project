@@ -32,6 +32,7 @@ model Workout {
   userId      String
   user        User      @relation(fields: [userId], references: [id])
   id          String    @id @default(uuid())
+  startedAt   DateTime  @default(now())
   completedAt DateTime?
   sets        Set[]
 }
@@ -44,4 +45,5 @@ model Set {
   movement   Movement @relation(fields: [movementId], references: [id])
   reps       Int
   weight     Decimal  @db.Decimal(6, 2)
+  createdAt  DateTime @default(now())
 }

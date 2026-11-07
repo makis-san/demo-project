@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient, isUniqueViolation } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
 import { errorMiddleware } from "@/lib/errors.server";
 import { z } from "zod";
@@ -15,8 +15,7 @@ export const createMovementServerFn = createServerFn({ method: "POST" })
       });
       return { success: true as const, movement };
     } catch (error) {
-      // P2002 is Prisma's unique constraint error: this user already has the name.
-      if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      if (isUniqueViolation(error)) {
         return { success: false as const, error: "You already have a movement with this name" };
       }
       throw error;
