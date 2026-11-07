@@ -160,7 +160,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="overflow-hidden">
+      <body>
         {children}
         <ToastContainer position="top-right" autoClose={4000} theme="light" />
         {config.environment === "development" && (
