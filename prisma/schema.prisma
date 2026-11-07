@@ -45,4 +45,5 @@ model Set {
   movement   Movement @relation(fields: [movementId], references: [id])
   reps       Int
   weight     Decimal  @db.Decimal(6, 2)
+  createdAt  DateTime @default(now())
 }

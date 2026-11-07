@@ -6,6 +6,9 @@ import { repsSchema, weightSchema } from "@/lib/validation";
 import { withNumberWeight } from "@/lib/sets.server";
 import { z } from "zod";
 
+// createdAt alone can tie for sets added in the same millisecond, so id breaks the tie.
+const setOrder = [{ createdAt: "asc" as const }, { id: "asc" as const }];
+
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
@@ -29,6 +32,7 @@ export const getCurrentWorkoutServerFn = createServerFn()
       include: {
         sets: {
           include: { movement: true },
+          orderBy: setOrder,
         },
       },
     });
@@ -116,6 +120,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
       include: {
         sets: {
           include: { movement: true },
+          orderBy: setOrder,
         },
       },
     });
