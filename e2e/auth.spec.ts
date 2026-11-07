@@ -275,6 +275,25 @@ test.describe("Rate limit", () => {
     await expect(page.getByText(refused)).toBeVisible();
   });
 
+  test("should not let a client change its address with X-Forwarded-For", async ({ freshPage }) => {
+    // Unless the server is told to trust a proxy (TRUST_PROXY), the header is ignored.
+    const user = await createUser(freshPage);
+
+    const page = await freshPage();
+    await gotoApp(page, "/sign-in");
+    await page.getByLabel("Email").fill(user.email);
+
+    for (let i = 0; i < 5; i++) {
+      await page.setExtraHTTPHeaders({ "x-forwarded-for": `203.0.113.${i + 1}` });
+      await attempt(page, `Wrong-password-${i}`);
+      await expect(page.getByText(wrong)).toBeVisible();
+    }
+
+    await page.setExtraHTTPHeaders({ "x-forwarded-for": "203.0.113.99" });
+    await attempt(page, `Wrong-password-6`);
+    await expect(page.getByText(refused)).toBeVisible();
+  });
+
   test("should not count successful sign-ins", async ({ freshPage }) => {
     const user = await createUser(freshPage);
     for (let i = 0; i < 7; i++) await signedInPage(freshPage, user);
