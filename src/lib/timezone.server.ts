@@ -1,13 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie } from "@tanstack/react-start/server";
-import { defaultTimeZone, isValidTimeZone, timeZoneCookieName } from "./timezone";
+import { resolveTimeZone } from "./request-timezone.server";
 
-/**
- * The browser's timezone as saved in a cookie. The cookie comes from the
- * request, so it is checked before use. Without a valid one, UTC is used until
- * the browser sets the cookie.
- */
-export const getTimeZoneServerFn = createServerFn().handler(async () => {
-  const value = getCookie(timeZoneCookieName);
-  return value && isValidTimeZone(value) ? value : defaultTimeZone;
-});
+/** The timezone the server renders dates in for this request. See resolveTimeZone. */
+export const getTimeZoneServerFn = createServerFn().handler(async () => resolveTimeZone());

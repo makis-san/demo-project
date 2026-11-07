@@ -12,8 +12,8 @@ type LineChartProps = {
   points: ChartPoint[];
   formatX: (x: number) => string;
   formatY?: (y: number) => string;
-  /** Start the y axis at 0, for totals and counts. Weights use the data range. */
-  startAtZero?: boolean;
+  /** Smallest gap between y axis labels, for example 1 so a count of reps never shows 7.5. */
+  minTickStep?: number;
   ariaLabel: string;
 };
 
@@ -31,7 +31,7 @@ export function LineChart({
   points,
   formatX,
   formatY = (y) => numberFormat.format(y),
-  startAtZero = false,
+  minTickStep = 0,
   ariaLabel,
 }: LineChartProps) {
   const xs = points.map((p) => p.x);
@@ -39,7 +39,7 @@ export function LineChart({
   const xMin = Math.min(...xs);
   const xMax = Math.max(...xs);
 
-  const yTicks = niceTicks(startAtZero ? 0 : Math.min(...ys), Math.max(...ys));
+  const yTicks = niceTicks(Math.min(...ys), Math.max(...ys), 5, minTickStep);
   const yMin = yTicks[0];
   const yMax = yTicks[yTicks.length - 1];
 

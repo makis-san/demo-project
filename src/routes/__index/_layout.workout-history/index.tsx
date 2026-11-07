@@ -3,17 +3,30 @@ import { createFileRoute } from "@tanstack/react-router";
 import { formatDate, shortDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
+import { deleteWorkoutsServerFn, getWorkoutHistoryServerFn } from "@/lib/workouts.server";
 import { Trash2 } from "lucide-react";
-import { workoutHistoryQueryOptions } from "./-queries/workout-history";
+import { progressionQueryOptions, workoutHistoryQueryOptions } from "./-queries/workout-history";
+import { ProgressionChart } from "./-progression-chart";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/__index/_layout/workout-history/")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(workoutHistoryQueryOptions());
+    const workouts = await context.queryClient.ensureQueryData(workoutHistoryQueryOptions());
+    // Fetch the chart for the movement that is selected first, so it is in the server-rendered page.
+    const first = movementsInHistory(workouts)[0];
+    if (first) await context.queryClient.ensureQueryData(progressionQueryOptions(first[0], context.timeZone));
   },
   component: WorkoutHistoryPage,
 });
+
+type HistoryWorkouts = Awaited<ReturnType<typeof getWorkoutHistoryServerFn>>;
+
+/** [id, name] of every movement that appears in a completed workout, sorted by name. */
+function movementsInHistory(workouts: HistoryWorkouts) {
+  return Array.from(
+    new Map(workouts.flatMap((w) => w.sets.map((s) => [s.movement.id, s.movement.name]))).entries(),
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+}
 
 function WorkoutHistoryPage() {
   const { timeZone } = Route.useRouteContext();
@@ -29,10 +42,7 @@ function WorkoutHistoryPage() {
     },
   });
 
-  // Get all unique movements across all workouts
-  const uniqueMovements = Array.from(
-    new Map(workouts.flatMap((w) => w.sets.map((s) => [s.movement.id, s.movement.name]))).entries(),
-  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const uniqueMovements = movementsInHistory(workouts);
 
   const toggleWorkout = (id: string) => {
     setSelectedWorkouts((prev) => {
@@ -65,14 +75,19 @@ function WorkoutHistoryPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Workout History</h1>
       </div>
 
+      {uniqueMovements.length > 0 && (
+        <ProgressionChart
+          // Reset the selection if the chosen movement disappears, for example after deleting workouts.
+          key={uniqueMovements.map(([id]) => id).join(",")}
+          movements={uniqueMovements.map(([id, name]) => ({ id, name }))}
+          timeZone={timeZone}
+        />
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Completed Workouts</CardTitle>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleDeleteSelected}
-            disabled={selectedWorkouts.size === 0}>
+          <Button size="sm" variant="destructive" onClick={handleDeleteSelected} disabled={selectedWorkouts.size === 0}>
             <Trash2 className="w-4 h-4 mr-2" />
             {deleteWorkoutsMutation.isPending ? "Deleting..." : `Delete Selected (${selectedWorkouts.size})`}
           </Button>
