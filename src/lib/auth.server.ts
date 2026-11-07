@@ -3,12 +3,26 @@ import { redirect } from "@tanstack/react-router";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
+import { configService } from "./config.server";
 import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
 import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
 
 const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
+ * Secure keeps the cookie off plain HTTP. It is on unless ENVIRONMENT says
+ * development, so a deployment that forgets to set it gets the safe flag, and
+ * localhost keeps working without HTTPS.
+ */
+function cookieOptions() {
+  return {
+    httpOnly: true,
+    secure: configService.getAppConfig().environment !== "development",
+    sameSite: "lax" as const,
+  };
+}
 
 /**
  * What the database stores for a session token. The token is 32 random bytes,
@@ -33,12 +47,7 @@ async function startSession(userId: string) {
   // Expired rows are already refused by the lookup below, this only keeps the table small.
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 
-  setCookie(sessionCookieName, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    expires: expiresAt,
-  });
+  setCookie(sessionCookieName, token, { ...cookieOptions(), expires: expiresAt });
 }
 
 /**
@@ -135,7 +144,7 @@ export const logoutServerFn = createServerFn({ method: "POST" }).handler(async (
     const prisma = await getServerSidePrismaClient();
     await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
   }
-  deleteCookie(sessionCookieName);
+  deleteCookie(sessionCookieName, cookieOptions());
   return { success: true };
 });
 
