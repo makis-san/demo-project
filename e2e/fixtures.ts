@@ -37,6 +37,14 @@ export async function signUp(page: Page, user: TestUser) {
   await waitForHydration(page);
 }
 
+/** Fills in the sign-in form and submits it. Does not wait for the result, the caller decides what to expect. */
+export async function submitSignIn(page: Page, email: string, password: string) {
+  await gotoApp(page, "/sign-in");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+}
+
 /**
  * Every test gets its own brand new user, signed in. Tests never share data,
  * so they can run in parallel and need no clean-up.

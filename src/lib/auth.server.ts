@@ -3,7 +3,8 @@ import { redirect } from "@tanstack/react-router";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
-import { getServerSidePrismaClient } from "./db.server";
+import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
+import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
 
@@ -74,7 +75,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
  * Signs in a user with email and password
  */
 export const signInServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.string().email(), password: z.string().max(128) }))
+  .inputValidator(z.object({ email: emailSchema, password: z.string().max(128) }))
   .handler(async ({ data }: { data: { email: string; password: string } }) => {
     const { email, password } = data;
 
@@ -101,23 +102,34 @@ export const signInServerFn = createServerFn({ method: "POST" })
  * Creates a new user account
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.email(), name: z.string().min(1), password: z.string().min(6).max(128) }))
+  .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: z.string().min(6).max(128) }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
 
     const prisma = await getServerSidePrismaClient();
 
+    const emailTaken = { success: false as const, error: "An account with this email already exists" };
+
+    // Looking first avoids hashing a password for an email that is taken. Two
+    // requests can still pass this check together, so the unique index has the
+    // final say and its violation gets the same answer.
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      return { success: false as const, error: "An account with this email already exists" };
+      return emailTaken;
     }
 
-    const user = await prisma.user.create({
-      data: { email, name, passwordHash: await hashPassword(password) },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: { email, name, passwordHash: await hashPassword(password) },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) return emailTaken;
+      throw error;
+    }
 
     setSessionCookie(user.id);
 
