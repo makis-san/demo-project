@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDate, shortDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/__index/_layout/workout-history/")({
 });
 
 function WorkoutHistoryPage() {
+  const { timeZone } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const { data: workouts } = useSuspenseQuery(workoutHistoryQueryOptions());
   const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
@@ -122,13 +124,7 @@ function WorkoutHistoryPage() {
                           />
                         </td>
                         <td className="py-3 px-4 text-slate-500">
-                          {workout.completedAt
-                            ? new Date(workout.completedAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : "-"}
+                          {workout.completedAt ? formatDate(workout.completedAt, timeZone, shortDate) : "-"}
                         </td>
                         <td className="py-3 px-4 text-right text-slate-600">{workout.sets.length}</td>
                         {uniqueMovements.map(([movementId]) => {

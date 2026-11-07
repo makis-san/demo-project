@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDate, fullDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/__index/_layout/current-workout/")({
 });
 
 function CurrentWorkoutPage() {
+  const { timeZone } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const { data: workout } = useSuspenseQuery(currentWorkoutQueryOptions());
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
@@ -100,14 +102,7 @@ function CurrentWorkoutPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {new Date(workout.startedAt).toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </CardTitle>
+          <CardTitle>{formatDate(workout.startedAt, timeZone, fullDate)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleAddSet} className="flex gap-2 items-center">
