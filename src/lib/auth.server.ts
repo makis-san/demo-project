@@ -63,6 +63,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
   const prisma = await getServerSidePrismaClient();
   const user = await prisma.user.findUnique({
     where: { id: userId },
+    select: { id: true, email: true, name: true },
   });
 
   return user;
