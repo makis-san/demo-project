@@ -284,7 +284,7 @@ test.describe("Unexpected failures", () => {
 
       expect(body).not.toMatch(rawDatabaseError);
       expect(body).toContain("Something went wrong. Please try again.");
-      await expect(page.getByText("An unexpected error occurred")).toBeVisible();
+      await expect(page.getByText("Something went wrong. Please try again.")).toBeVisible();
       await expect(page).toHaveURL(/\/create-account/);
     } finally {
       await repair();
@@ -307,10 +307,30 @@ test.describe("Unexpected failures", () => {
 
       expect(body).not.toMatch(rawDatabaseError);
       expect(body).toContain("Something went wrong. Please try again.");
-      await expect(page.getByText("An unexpected error occurred")).toBeVisible();
+      await expect(page.getByText("Something went wrong. Please try again.")).toBeVisible();
       await expect(page).toHaveURL(/\/sign-in/);
     } finally {
       await repair();
+    }
+  });
+
+  test("should show a generic message when the request gets no answer", async ({ freshPage }) => {
+    // A network failure has no server message. The browser's own text, "Failed to fetch", is not for the user.
+    for (const { path, button } of [
+      { path: "/sign-in", button: "Sign in" },
+      { path: "/create-account", button: "Create account" },
+    ]) {
+      const page = await freshPage();
+      await gotoApp(page, path);
+      if (path === "/create-account") await page.getByLabel("Name").fill("Offline Tester");
+      await page.getByLabel("Email").fill(newTestUser().email);
+      await page.getByLabel("Password").fill("Password-123");
+      await page.route("**/_serverFn/**", (route) => route.abort("connectionrefused"));
+
+      await page.getByRole("button", { name: button }).click();
+
+      await expect(page.getByText("Something went wrong. Please try again.")).toBeVisible();
+      await expect(page.getByText("Failed to fetch")).toHaveCount(0);
     }
   });
 
