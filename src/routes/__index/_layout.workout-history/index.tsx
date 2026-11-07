@@ -103,6 +103,7 @@ function WorkoutHistoryPage() {
                     <th className="py-3 px-4">
                       <input
                         type="checkbox"
+                        aria-label="Select all workouts"
                         checked={selectedWorkouts.size === workouts.length}
                         onChange={toggleAll}
                         className="rounded border-gray-300"
@@ -133,6 +134,7 @@ function WorkoutHistoryPage() {
                         <td className="py-3 px-4">
                           <input
                             type="checkbox"
+                            aria-label="Select workout"
                             checked={selectedWorkouts.has(workout.id)}
                             onChange={() => toggleWorkout(workout.id)}
                             className="rounded border-gray-300"

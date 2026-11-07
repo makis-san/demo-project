@@ -129,7 +129,10 @@ function CurrentWorkoutPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleAddSet} className="flex gap-2 items-center">
-            <Select value={selectedMovement} onChange={(e) => handleMovementChange(e.target.value)}>
+            <Select
+              aria-label="Movement"
+              value={selectedMovement}
+              onChange={(e) => handleMovementChange(e.target.value)}>
               <option value="">Select movement</option>
               {movements.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -139,6 +142,7 @@ function CurrentWorkoutPage() {
             </Select>
             <Input
               type="number"
+              aria-label="Weight"
               placeholder="Weight"
               value={weight}
               onChange={(e) => {
@@ -152,6 +156,7 @@ function CurrentWorkoutPage() {
             />
             <Input
               type="number"
+              aria-label="Reps"
               placeholder="Reps"
               value={reps}
               onChange={(e) => setReps(e.target.value)}
@@ -188,6 +193,7 @@ function CurrentWorkoutPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={`Remove ${set.movement.name} set`}
                     onClick={() => deleteSetMutation.mutate(set.id)}
                     className="h-8 w-8 text-slate-400">
                     <X className="w-4 h-4" />
