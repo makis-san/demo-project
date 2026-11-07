@@ -47,8 +47,7 @@ function CurrentWorkoutPage() {
   });
 
   const addSetMutation = useMutation({
-    mutationFn: (data: { movementId: string; reps: number; weight: number }) =>
-      addSetServerFn({ data }),
+    mutationFn: (data: { movementId: string; reps: number; weight: number }) => addSetServerFn({ data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       setReps("");
@@ -127,6 +126,7 @@ function CurrentWorkoutPage() {
               onChange={(e) => setWeight(e.target.value)}
               className="w-24"
               min={0}
+              max={9999.99}
               step="0.01"
             />
             <Input
@@ -136,6 +136,7 @@ function CurrentWorkoutPage() {
               onChange={(e) => setReps(e.target.value)}
               className="w-24"
               min={1}
+              max={1000}
             />
             <Button type="submit" disabled={!selectedMovement || !reps || !weight} size="sm">
               <Plus className="w-4 h-4 mr-1" />

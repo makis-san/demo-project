@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getServerSidePrismaClient } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
+import { errorMiddleware } from "@/lib/errors.server";
 import { z } from "zod";
 
 export const createMovementServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .inputValidator(z.object({ name: z.string().trim().min(1).max(100) }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { name: string } }) => {
     const prisma = await getServerSidePrismaClient();
@@ -23,7 +24,7 @@ export const createMovementServerFn = createServerFn({ method: "POST" })
   });
 
 export const getMovementsServerFn = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
     return prisma.movement.findMany({
