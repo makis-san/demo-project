@@ -63,13 +63,13 @@ export const completeWorkoutServerFn = createServerFn({ method: "POST" })
     const prisma = await getServerSidePrismaClient();
     const workout = await findActiveWorkout(prisma, context.user.id);
     if (!workout) {
-      return { success: false, error: "No active workout to complete" };
+      return { success: false as const, error: "No active workout to complete" };
     }
     await prisma.workout.update({
       where: { id: workout.id },
       data: { completedAt: new Date() },
     });
-    return { success: true };
+    return { success: true as const };
   });
 
 export const addSetServerFn = createServerFn({ method: "POST" })
@@ -86,14 +86,14 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       const prisma = await getServerSidePrismaClient();
       const workout = await findActiveWorkout(prisma, context.user.id);
       if (!workout) {
-        return { success: false, error: "No active workout" };
+        return { success: false as const, error: "No active workout" };
       }
       const movement = await prisma.movement.findFirst({
         where: { id: data.movementId, userId: context.user.id },
         select: { id: true },
       });
       if (!movement) {
-        return { success: false, error: "Movement not found" };
+        return { success: false as const, error: "Movement not found" };
       }
       const set = await prisma.set.create({
         data: {
@@ -104,7 +104,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
         },
         include: { movement: true },
       });
-      return { success: true, set: withNumberWeight(set) };
+      return { success: true as const, set: withNumberWeight(set) };
     },
   );
 
@@ -118,10 +118,10 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
       where: { id: data.setId, workout: { userId: context.user.id, completedAt: null } },
     });
     if (!set) {
-      return { success: false, error: "Set not found" };
+      return { success: false as const, error: "Set not found" };
     }
     await prisma.set.delete({ where: { id: data.setId } });
-    return { success: true };
+    return { success: true as const };
   });
 
 export const getWorkoutHistoryServerFn = createServerFn()

@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, gotoApp } from "./fixtures";
 import { getDb } from "./db";
 import { addMovement, addSet, completeWorkout, goTo, setRows, startWorkout } from "./helpers";
 
@@ -107,6 +107,20 @@ test.describe("Workouts", () => {
       await goTo(page, "Workout History");
       await expect(page.getByText("No completed workouts yet.")).toHaveCount(0);
       await expect(page.getByRole("checkbox", { name: "Select workout" })).toHaveCount(1);
+    });
+  });
+
+  test.describe("complete when it is already completed", () => {
+    test("should show an error when the workout was completed in another tab", async ({ page }) => {
+      await startWorkout(page);
+      const otherTab = await page.context().newPage();
+      await gotoApp(otherTab, "/current-workout");
+      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
+      await expect(otherTab.getByText(noActiveWorkout)).toBeVisible();
+
+      await page.getByRole("button", { name: "Complete Workout" }).click();
+
+      await expect(page.locator(".Toastify__toast")).toContainText("No active workout to complete");
     });
   });
 
