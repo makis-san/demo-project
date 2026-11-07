@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  name      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  password  String
-  workouts  Workout[]
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  passwordHash String
+  workouts     Workout[]
 }
 
 model Movement {
