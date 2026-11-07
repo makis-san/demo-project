@@ -5,6 +5,7 @@ import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
 import { configService } from "./config.server";
 import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
+import { errorMiddleware } from "./errors.server";
 import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
@@ -83,6 +84,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
  * Signs in a user with email and password
  */
 export const signInServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware])
   .inputValidator(z.object({ email: emailSchema, password: z.string().max(128) }))
   .handler(async ({ data }: { data: { email: string; password: string } }) => {
     const { email, password } = data;
@@ -115,6 +117,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
  * Creates a new user account
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware])
   .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: z.string().min(6).max(128) }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
