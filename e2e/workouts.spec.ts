@@ -1,5 +1,5 @@
 import { test, expect, gotoApp } from "./fixtures";
-import { getDb } from "./db";
+import { breakWrites, getDb } from "./db";
 import { addMovement, addSet, completeWorkout, goTo, setRows, startWorkout } from "./helpers";
 
 const noActiveWorkout = "No active workout. Ready to start?";
@@ -155,6 +155,29 @@ test.describe("Workouts", () => {
       // Deleted for good: a reload does not bring it back.
       await page.reload();
       await expect(historyRows(page)).toHaveCount(1);
+    });
+
+    test("should keep a workout and its sets when the delete fails", async ({ page, user }) => {
+      await completeWorkoutsWithSetCounts(page, [3]);
+      const workout = await getDb().workout.findFirstOrThrow({ where: { user: { email: user.email } } });
+      // The database fails after it has already removed the sets. Everything has to be undone.
+      const repair = await breakWrites("Workout", "AFTER DELETE", `OLD.id = '${workout.id}'`);
+      try {
+        await historyRows(page).getByRole("checkbox").check();
+        await page.getByRole("button", { name: "Delete Selected (1)" }).click();
+
+        await expect(page.locator(".Toastify__toast")).toContainText("Something went wrong");
+        await expect(historyRows(page)).toHaveCount(1);
+        expect(await getDb().set.count({ where: { workoutId: workout.id } })).toBe(3);
+      } finally {
+        await repair();
+      }
+
+      // With the failure gone the same delete works, and removes the sets with the workout.
+      await page.getByRole("button", { name: "Delete Selected (1)" }).click();
+      await expect(historyRows(page)).toHaveCount(0);
+      expect(await getDb().workout.count({ where: { id: workout.id } })).toBe(0);
+      expect(await getDb().set.count({ where: { workoutId: workout.id } })).toBe(0);
     });
 
     test("should allow selecting multiple workouts for deletion", async ({ page }) => {

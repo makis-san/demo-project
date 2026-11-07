@@ -146,10 +146,8 @@ export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
   .inputValidator(z.object({ workoutIds: z.array(z.string()) }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { workoutIds: string[] } }) => {
     const prisma = await getServerSidePrismaClient();
-    // Delete sets first, then workouts (only for this user's workouts)
-    await prisma.set.deleteMany({
-      where: { workout: { id: { in: data.workoutIds }, userId: context.user.id } },
-    });
+    // Only this user's workouts. Their sets are removed by the database in the same statement
+    // (ON DELETE CASCADE), so a failure cannot leave a workout without its sets.
     await prisma.workout.deleteMany({
       where: { id: { in: data.workoutIds }, userId: context.user.id },
     });
