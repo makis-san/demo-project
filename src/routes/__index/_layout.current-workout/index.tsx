@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatDate, fullDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,12 +14,14 @@ import {
 import { Play, Check, Plus, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
+import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(currentWorkoutQueryOptions()),
       context.queryClient.ensureQueryData(movementsQueryOptions()),
+      context.queryClient.ensureQueryData(latestBodyWeightQueryOptions()),
     ]);
   },
   component: CurrentWorkoutPage,
@@ -30,9 +32,30 @@ function CurrentWorkoutPage() {
   const queryClient = useQueryClient();
   const { data: workout } = useSuspenseQuery(currentWorkoutQueryOptions());
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
+  const { data: latestBodyWeight } = useSuspenseQuery(latestBodyWeightQueryOptions());
   const [selectedMovement, setSelectedMovement] = useState("");
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
+  // True while the weight field holds the body weight we filled in, not something the user typed.
+  const [weightIsBodyWeight, setWeightIsBodyWeight] = useState(false);
+
+  const selected = movements.find((m) => m.id === selectedMovement);
+  const needsBodyWeight = !!selected?.isBodyWeight && latestBodyWeight === null;
+
+  const handleMovementChange = (movementId: string) => {
+    setSelectedMovement(movementId);
+    const movement = movements.find((m) => m.id === movementId);
+    if (movement?.isBodyWeight && latestBodyWeight !== null) {
+      // Keep a weight the user typed, for example the added weight on dips.
+      if (weight === "" || weightIsBodyWeight) {
+        setWeight(String(latestBodyWeight));
+        setWeightIsBodyWeight(true);
+      }
+    } else if (weightIsBodyWeight) {
+      setWeight("");
+      setWeightIsBodyWeight(false);
+    }
+  };
 
   const createWorkoutMutation = useMutation({
     mutationFn: () => createWorkoutServerFn(),
@@ -106,7 +129,7 @@ function CurrentWorkoutPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleAddSet} className="flex gap-2 items-center">
-            <Select value={selectedMovement} onChange={(e) => setSelectedMovement(e.target.value)}>
+            <Select value={selectedMovement} onChange={(e) => handleMovementChange(e.target.value)}>
               <option value="">Select movement</option>
               {movements.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -118,7 +141,10 @@ function CurrentWorkoutPage() {
               type="number"
               placeholder="Weight"
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
+              onChange={(e) => {
+                setWeight(e.target.value);
+                setWeightIsBodyWeight(false);
+              }}
               className="w-24"
               min={0}
               max={9999.99}
@@ -138,6 +164,15 @@ function CurrentWorkoutPage() {
               {addSetMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </form>
+          {needsBodyWeight && (
+            <p className="text-sm text-slate-500">
+              No body weight recorded yet. Enter a weight, or{" "}
+              <Link to="/body-weight" className="text-primary hover:underline">
+                log your body weight
+              </Link>{" "}
+              to have it filled in.
+            </p>
+          )}
           {workout.sets.length === 0 ? (
             <p className="text-sm text-slate-500">No sets yet. Add exercises to your workout!</p>
           ) : (
