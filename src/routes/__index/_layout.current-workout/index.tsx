@@ -134,7 +134,7 @@ function CurrentWorkoutPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
         <Button variant="outline" onClick={() => completeWorkoutMutation.mutate()}>
           <Check className="w-4 h-4 mr-2" />
@@ -147,7 +147,7 @@ function CurrentWorkoutPage() {
           <CardTitle>{formatDate(workout.startedAt, timeZone, fullDate)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleAddSet} className="flex gap-2 items-center">
+          <form onSubmit={handleAddSet} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Select
               aria-label="Movement"
               value={selectedMovement}
@@ -163,12 +163,13 @@ function CurrentWorkoutPage() {
               type="number"
               aria-label="Weight"
               placeholder="Weight"
+              inputMode="decimal"
               value={weight}
               onChange={(e) => {
                 setWeight(e.target.value);
                 setWeightIsBodyWeight(false);
               }}
-              className="w-24"
+              className="sm:w-24"
               min={0}
               max={9999.99}
               step="0.01"
@@ -177,13 +178,18 @@ function CurrentWorkoutPage() {
               type="number"
               aria-label="Reps"
               placeholder="Reps"
+              inputMode="numeric"
               value={reps}
               onChange={(e) => setReps(e.target.value)}
-              className="w-24"
+              className="sm:w-24"
               min={1}
               max={1000}
             />
-            <Button type="submit" disabled={!selectedMovement || !reps || !weight} size="sm">
+            <Button
+              type="submit"
+              disabled={!selectedMovement || !reps || !weight}
+              size="sm"
+              className="h-10 w-full sm:h-8 sm:w-auto">
               <Plus className="w-4 h-4 mr-1" />
               {addSetMutation.isPending ? "Adding..." : "Add"}
             </Button>
@@ -205,7 +211,7 @@ function CurrentWorkoutPage() {
                 <li key={set.id} className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
                   <div>
                     <span className="font-medium">{set.movement.name}</span>
-                    <span className="text-slate-500 ml-2">
+                    <span className="text-slate-500 ml-2 whitespace-nowrap">
                       {set.reps} reps × {set.weight} {weightUnit}
                     </span>
                   </div>
@@ -214,7 +220,7 @@ function CurrentWorkoutPage() {
                     size="icon"
                     aria-label={`Remove ${set.movement.name} set`}
                     onClick={() => deleteSetMutation.mutate(set.id)}
-                    className="h-8 w-8 text-slate-400">
+                    className="h-10 w-10 text-slate-400 sm:h-8 sm:w-8">
                     <X className="w-4 h-4" />
                   </Button>
                 </li>

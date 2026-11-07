@@ -91,7 +91,7 @@ function WorkoutHistoryPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
           <CardTitle>Completed Workouts</CardTitle>
           <Button size="sm" variant="destructive" onClick={handleDeleteSelected} disabled={selectedWorkouts.size === 0}>
             <Trash2 className="w-4 h-4 mr-2" />
@@ -107,7 +107,7 @@ function WorkoutHistoryPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      <th className="py-3 px-4">
+                      <th className="whitespace-nowrap py-3 px-4">
                         <input
                           type="checkbox"
                           aria-label="Select all workouts"
@@ -116,10 +116,10 @@ function WorkoutHistoryPage() {
                           className="rounded border-gray-300"
                         />
                       </th>
-                      <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
-                      <th className="text-right py-3 px-4 font-medium text-slate-600">Sets</th>
+                      <th className="text-left whitespace-nowrap py-3 px-4 font-medium text-slate-600">Date</th>
+                      <th className="text-right whitespace-nowrap py-3 px-4 font-medium text-slate-600">Sets</th>
                       {movements.map(({ id, name }) => (
-                        <th key={id} className="text-right py-3 px-4 font-medium text-slate-600">
+                        <th key={id} className="text-right whitespace-nowrap py-3 px-4 font-medium text-slate-600">
                           {name}
                         </th>
                       ))}
@@ -138,7 +138,7 @@ function WorkoutHistoryPage() {
                         <tr
                           key={workout.id}
                           className={`border-b border-slate-100 ${isSelected ? "bg-primary/10" : "hover:bg-slate-50"}`}>
-                          <td className="py-3 px-4">
+                          <td className="whitespace-nowrap py-3 px-4">
                             <input
                               type="checkbox"
                               aria-label="Select workout"
@@ -147,15 +147,17 @@ function WorkoutHistoryPage() {
                               className="rounded border-gray-300"
                             />
                           </td>
-                          <td className="py-3 px-4 text-slate-500">
+                          <td className="whitespace-nowrap py-3 px-4 text-slate-500">
                             {workout.completedAt ? formatDate(workout.completedAt, timeZone, shortDate) : "-"}
                           </td>
-                          <td className="py-3 px-4 text-right text-slate-600">{workout.sets.length}</td>
+                          <td className="whitespace-nowrap py-3 px-4 text-right text-slate-600">
+                            {workout.sets.length}
+                          </td>
                           {movements.map(({ id: movementId }) => {
                             const movementSets = setsByMovement.get(movementId);
                             if (!movementSets || movementSets.length === 0) {
                               return (
-                                <td key={movementId} className="py-3 px-4 text-right text-slate-300">
+                                <td key={movementId} className="whitespace-nowrap py-3 px-4 text-right text-slate-300">
                                   -
                                 </td>
                               );
@@ -166,7 +168,7 @@ function WorkoutHistoryPage() {
                             );
                             const numSets = movementSets.length;
                             return (
-                              <td key={movementId} className="py-3 px-4 text-right text-slate-600">
+                              <td key={movementId} className="whitespace-nowrap py-3 px-4 text-right text-slate-600">
                                 {maxWeight} {weightUnit} / {avgReps} reps / {numSets} sets
                               </td>
                             );
