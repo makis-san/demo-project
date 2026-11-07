@@ -8,36 +8,30 @@ import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
 
-// In production, use a proper secret from environment variables
-const COOKIE_SECRET = process.env.COOKIE_SECRET || "dev-secret-change-in-production";
+const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
- * Signs a user ID to create a tamper-proof session token
+ * What the database stores for a session token. The token is 32 random bytes,
+ * so it cannot be guessed and a fast hash is enough. A slow one like argon2 is
+ * for passwords, which people choose and can be guessed.
  */
-function signUserId(userId: string): string {
-  const signature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  return `${userId}.${signature}`;
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 /**
- * Verifies a signed session token and returns the user ID if valid
+ * Signs the user in on this browser: stores a new session and sets the cookie.
+ * Every call makes a new random token, so a token seen before sign-in is never
+ * reused afterwards.
  */
-function verifySessionToken(token: string): string | null {
-  const [userId, signature] = token.split(".");
-  if (!userId || !signature) return null;
+async function startSession(userId: string) {
+  const prisma = await getServerSidePrismaClient();
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + sessionLifetimeMs);
 
-  const expectedSignature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  if (signature !== expectedSignature) return null;
-
-  return userId;
-}
-
-/**
- * Sets the session cookie for a user (internal use only)
- */
-function setSessionCookie(userId: string) {
-  const token = signUserId(userId);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  await prisma.session.create({ data: { tokenHash: hashToken(token), userId, expiresAt } });
+  // Expired rows are already refused by the lookup below, this only keeps the table small.
+  await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 
   setCookie(sessionCookieName, token, {
     httpOnly: true,
@@ -52,23 +46,18 @@ function setSessionCookie(userId: string) {
  * @returns User object or null if not logged in
  */
 export const getUserServerFn = createServerFn().handler(async () => {
-  const sessionToken = getCookie(sessionCookieName);
-  if (!sessionToken) {
-    return null;
-  }
-
-  const userId = verifySessionToken(sessionToken);
-  if (!userId) {
+  const token = getCookie(sessionCookieName);
+  if (!token) {
     return null;
   }
 
   const prisma = await getServerSidePrismaClient();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true },
+  const session = await prisma.session.findFirst({
+    where: { tokenHash: hashToken(token), expiresAt: { gt: new Date() } },
+    select: { user: { select: { id: true, email: true, name: true } } },
   });
 
-  return user;
+  return session?.user ?? null;
 });
 
 /**
@@ -93,7 +82,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
       return { success: false as const, error: "Invalid email or password" };
     }
 
-    setSessionCookie(user.id);
+    await startSession(user.id);
 
     return { success: true as const };
   });
@@ -131,7 +120,7 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
       throw error;
     }
 
-    setSessionCookie(user.id);
+    await startSession(user.id);
 
     return { success: true as const };
   });
@@ -140,6 +129,12 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
  * Logs out the current user
  */
 export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
+  const token = getCookie(sessionCookieName);
+  if (token) {
+    // Deleting the row is what signs out: a copy of the token stops working too.
+    const prisma = await getServerSidePrismaClient();
+    await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
+  }
   deleteCookie(sessionCookieName);
   return { success: true };
 });
