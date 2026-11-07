@@ -153,6 +153,39 @@ test.describe("Sessions", () => {
     expect(await first.evaluate(() => document.cookie)).not.toContain("session=");
   });
 
+  test("should end the session in the database when Log out is clicked", async ({ freshPage }) => {
+    const user = await createUser(freshPage);
+    const page = await signedInPage(freshPage, user);
+    // Signing up made another session for this user, so look at this browser's own row.
+    const tokenHash = createHash("sha256")
+      .update((await sessionCookie(page)).value)
+      .digest("hex");
+    expect(await getDb().session.count({ where: { tokenHash } })).toBe(1);
+
+    await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page).toHaveURL(/\/sign-in/);
+
+    expect(await getDb().session.count({ where: { tokenHash } })).toBe(0);
+  });
+
+  test("should not sign anyone out when /logout is opened by its URL", async ({ freshPage }) => {
+    const user = await createUser(freshPage);
+    const page = await signedInPage(freshPage, user);
+    const tokenHash = createHash("sha256")
+      .update((await sessionCookie(page)).value)
+      .digest("hex");
+
+    const response = await page.goto("/logout");
+    expect(response?.status()).toBe(404);
+    await page.waitForTimeout(1000); // the old page signed out from an effect, after it had loaded
+
+    expect(await getDb().session.count({ where: { tokenHash } })).toBe(1);
+    expect((await page.context().cookies()).find((c) => c.name === "session")).toBeDefined();
+    await page.goto("/current-workout");
+    await expect(page).toHaveURL(/\/current-workout/);
+    await expect(page.getByRole("heading", { level: 1, name: "Current Workout" })).toBeVisible();
+  });
+
   test("should only sign out the browser that logged out", async ({ freshPage }) => {
     const user = await createUser(freshPage);
     const laptop = await signedInPage(freshPage, user);

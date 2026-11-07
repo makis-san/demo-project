@@ -1,6 +1,8 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { Dumbbell, History, BicepsFlexed, Scale, User, LogOut } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { logoutServerFn } from "@/lib/auth.server";
 
 export const Route = createFileRoute("/__index/_layout")({
   component: RouteComponent,
@@ -16,6 +18,26 @@ const navItems = [
   { to: "/movements", label: "Movements", icon: BicepsFlexed },
   { to: "/body-weight", label: "Body Weight", icon: Scale },
 ] as const;
+
+function LogoutButton() {
+  const logoutMutation = useMutation({
+    mutationFn: () => logoutServerFn(),
+    // A full page load, not a client navigation, so nothing the last user saw stays in the browser's memory.
+    onSuccess: () => window.location.assign("/sign-in"),
+  });
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => logoutMutation.mutate()}
+      disabled={logoutMutation.isPending}
+      className="w-full justify-start gap-3 text-slate-600">
+      <LogOut className="w-4 h-4" />
+      Log out
+    </Button>
+  );
+}
 
 function RouteComponent() {
   const { user } = Route.useRouteContext();
@@ -42,12 +64,7 @@ function RouteComponent() {
               <p className="font-medium truncate">{user.name || user.email}</p>
             </div>
           </div>
-          <a href="/logout">
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-3 text-slate-600">
-              <LogOut className="w-4 h-4" />
-              Log out
-            </Button>
-          </a>
+          <LogoutButton />
         </div>
       </nav>
       <main className="flex-1 p-6">

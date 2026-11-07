@@ -161,18 +161,21 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
   });
 
 /**
- * Logs out the current user
+ * Logs out the current user. A POST made by the Log out button. There is no
+ * page for it, so opening a URL cannot sign anyone out.
  */
-export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
-  const token = getCookie(sessionCookieName);
-  if (token) {
-    // Deleting the row is what signs out: a copy of the token stops working too.
-    const prisma = await getServerSidePrismaClient();
-    await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
-  }
-  deleteCookie(sessionCookieName, cookieOptions());
-  return { success: true };
-});
+export const logoutServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware])
+  .handler(async () => {
+    const token = getCookie(sessionCookieName);
+    if (token) {
+      // Deleting the row is what signs out: a copy of the token stops working too.
+      const prisma = await getServerSidePrismaClient();
+      await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
+    }
+    deleteCookie(sessionCookieName, cookieOptions());
+    return { success: true };
+  });
 
 /**
  * Authentication middleware that ensures user is logged in
