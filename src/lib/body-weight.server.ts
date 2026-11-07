@@ -40,3 +40,16 @@ export const deleteBodyWeightServerFn = createServerFn({ method: "POST" })
     if (count === 0) return { success: false as const, error: "Entry not found" };
     return { success: true as const };
   });
+
+/** The user's most recently recorded body weight, or null when they have none. */
+export const getLatestBodyWeightServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }) => {
+    const prisma = await getServerSidePrismaClient();
+    const latest = await prisma.bodyWeight.findFirst({
+      where: { userId: context.user.id },
+      select: { weight: true },
+      orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
+    });
+    return latest ? latest.weight.toNumber() : null;
+  });
