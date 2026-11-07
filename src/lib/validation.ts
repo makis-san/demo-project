@@ -9,3 +9,6 @@ export const weightSchema = z
 
 /** A whole number of reps, at least 1. */
 export const repsSchema = z.int().min(1).max(1000);
+
+/** A body weight: same range and precision as a set weight, but not zero. */
+export const bodyWeightSchema = weightSchema.refine((value) => value > 0, "Must be more than 0");
