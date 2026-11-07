@@ -88,8 +88,8 @@ export function LineChart({
         </text>
       ))}
       {points.length > 1 && <path d={path} fill="none" strokeWidth={2} className="stroke-primary" />}
-      {points.map((p) => (
-        <circle key={`${p.x}-${p.y}`} cx={scaleX(p.x)} cy={scaleY(p.y)} r={4} className="fill-primary">
+      {points.map((p, i) => (
+        <circle key={`${p.x}-${p.y}-${i}`} cx={scaleX(p.x)} cy={scaleY(p.y)} r={4} className="fill-primary">
           <title>{p.title}</title>
         </circle>
       ))}
