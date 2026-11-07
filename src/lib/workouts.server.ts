@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getServerSidePrismaClient } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
+import { withNumberWeight } from "@/lib/sets.server";
 import { z } from "zod";
 
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
@@ -29,7 +30,7 @@ export const getCurrentWorkoutServerFn = createServerFn()
         },
       },
     });
-    return workout;
+    return workout && { ...workout, sets: workout.sets.map(withNumberWeight) };
   });
 
 export const completeWorkoutServerFn = createServerFn({ method: "POST" })
@@ -83,7 +84,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
         },
         include: { movement: true },
       });
-      return { success: true, set };
+      return { success: true, set: withNumberWeight(set) };
     },
   );
 
@@ -116,7 +117,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
         },
       },
     });
-    return workouts;
+    return workouts.map((workout) => ({ ...workout, sets: workout.sets.map(withNumberWeight) }));
   });
 
 export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })

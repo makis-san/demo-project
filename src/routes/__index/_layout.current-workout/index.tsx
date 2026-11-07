@@ -68,7 +68,7 @@ function CurrentWorkoutPage() {
     addSetMutation.mutate({
       movementId: selectedMovement,
       reps: parseInt(reps),
-      weight: parseInt(weight),
+      weight: parseFloat(weight),
     });
   };
 
@@ -127,6 +127,7 @@ function CurrentWorkoutPage() {
               onChange={(e) => setWeight(e.target.value)}
               className="w-24"
               min={0}
+              step="0.01"
             />
             <Input
               type="number"
