@@ -38,3 +38,65 @@ jobs:
         run: bun run typecheck
       - name: Build
         run: bun run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: setlist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The dev server does not read these from .env, so they are set here.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/setlist
+      ENVIRONMENT: development
+      VITE_ENVIRONMENT: development
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      # The app runs on Node. The Docker image uses Node 22, so use the same here.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: bunx prisma migrate deploy
+      # The same command the Docker image runs. Playwright's config expects the app on port 3000.
+      - name: Start the app
+        run: |
+          nohup bunx vite dev --host 0.0.0.0 --port 3000 > server.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -fsS http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          echo "The app did not start in 2 minutes. Its log:"
+          cat server.log
+          exit 1
+      # CI is set by GitHub, so Playwright runs with one worker and two retries.
+      - name: Run e2e tests
+        run: bun run test
+      - name: Upload the reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report
+            test-results
+            server.log
+          retention-days: 7
