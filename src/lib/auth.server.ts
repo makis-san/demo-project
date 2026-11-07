@@ -5,6 +5,7 @@ import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
 import { getServerSidePrismaClient } from "./db.server";
 import { z } from "zod";
+import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
 
 // In production, use a proper secret from environment variables
 const COOKIE_SECRET = process.env.COOKIE_SECRET || "dev-secret-change-in-production";
@@ -63,6 +64,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
   const prisma = await getServerSidePrismaClient();
   const user = await prisma.user.findUnique({
     where: { id: userId },
+    select: { id: true, email: true, name: true },
   });
 
   return user;
@@ -72,7 +74,7 @@ export const getUserServerFn = createServerFn().handler(async () => {
  * Signs in a user with email and password
  */
 export const signInServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.string().email(), password: z.string() }))
+  .inputValidator(z.object({ email: z.string().email(), password: z.string().max(128) }))
   .handler(async ({ data }: { data: { email: string; password: string } }) => {
     const { email, password } = data;
 
@@ -81,7 +83,12 @@ export const signInServerFn = createServerFn({ method: "POST" })
       where: { email },
     });
 
-    if (!user || user.password !== password) {
+    if (!user) {
+      await verifyAgainstDummy(password);
+      return { success: false as const, error: "Invalid email or password" };
+    }
+
+    if (!(await verifyPassword(user.passwordHash, password))) {
       return { success: false as const, error: "Invalid email or password" };
     }
 
@@ -94,7 +101,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
  * Creates a new user account
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.email(), name: z.string().min(1), password: z.string().min(6) }))
+  .inputValidator(z.object({ email: z.email(), name: z.string().min(1), password: z.string().min(6).max(128) }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
 
@@ -109,7 +116,7 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
     }
 
     const user = await prisma.user.create({
-      data: { email, name, password },
+      data: { email, name, passwordHash: await hashPassword(password) },
     });
 
     setSessionCookie(user.id);

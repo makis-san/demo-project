@@ -8,7 +8,6 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
 import { useClientConfig } from "@/lib/config.client";
 import { AlertTriangle, RefreshCw, Home, Bug, Copy, Check } from "lucide-react";
-import { getServerConfigServerFn } from "@/lib/get-server-config.server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -113,7 +112,6 @@ ${error.stack || "No stack trace available"}`;
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   beforeLoad: async () => {
-    await getServerConfigServerFn();
     const user = await getUserServerFn();
     return { user };
   },

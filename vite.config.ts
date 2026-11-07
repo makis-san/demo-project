@@ -24,6 +24,12 @@ const config = defineConfig({
   server: {
     watch: { usePolling: true },
   },
+  // Native module used only on the server. Without this the dependency
+  // optimizer scans it with browser conditions and fails to resolve its
+  // wasm fallback.
+  optimizeDeps: {
+    exclude: ["@node-rs/argon2"],
+  },
 });
 
 export default config;

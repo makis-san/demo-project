@@ -28,9 +28,7 @@ function CreateAccountPage() {
     setIsLoading(true);
 
     try {
-      console.log("Creating account", { email, name, password });
       const result = await createAccountServerFn({ data: { email, name, password } });
-      console.log("Result", result);
       if (result.success) {
         router.navigate({ to: "/" });
       } else {
@@ -97,6 +95,7 @@ function CreateAccountPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                maxLength={128}
                 autoComplete="new-password"
               />
               <p className="text-xs text-gray-500">Must be at least 6 characters</p>
