@@ -8,6 +8,16 @@ import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
 import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
+import {
+  clientAddress,
+  giveBackSignInAttempt,
+  giveBackSignUpAttempt,
+  takeSignInAttempt,
+  takeSignUpAttempt,
+} from "./rate-limit.server";
+
+// The same answer whether or not the email has an account, so it reveals nothing about accounts.
+const tooManyAttempts = { success: false as const, error: "Too many attempts. Try again in a few minutes." };
 
 const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -77,6 +87,10 @@ export const signInServerFn = createServerFn({ method: "POST" })
   .handler(async ({ data }: { data: { email: string; password: string } }) => {
     const { email, password } = data;
 
+    // Before any work is done, so refused attempts cost nothing.
+    const ip = clientAddress();
+    if (!takeSignInAttempt(ip, email)) return tooManyAttempts;
+
     const prisma = await getServerSidePrismaClient();
     const user = await prisma.user.findUnique({
       where: { email },
@@ -91,6 +105,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
       return { success: false as const, error: "Invalid email or password" };
     }
 
+    giveBackSignInAttempt(ip, email);
     await startSession(user.id);
 
     return { success: true as const };
@@ -103,6 +118,9 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
   .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: z.string().min(6).max(128) }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
+
+    const ip = clientAddress();
+    if (!takeSignUpAttempt(ip)) return tooManyAttempts;
 
     const prisma = await getServerSidePrismaClient();
 
@@ -129,6 +147,7 @@ export const createAccountServerFn = createServerFn({ method: "POST" })
       throw error;
     }
 
+    giveBackSignUpAttempt(ip);
     await startSession(user.id);
 
     return { success: true as const };

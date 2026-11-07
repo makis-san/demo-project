@@ -223,3 +223,60 @@ test.describe("Sessions", () => {
     expect(redirected, "protected calls that redirected").toBeGreaterThan(0);
   });
 });
+
+test.describe("Rate limit", () => {
+  const wrong = "Invalid email or password";
+  const refused = "Too many attempts";
+
+  /** Submits the sign-in form and waits for the server's answer, so the message on screen is the new one. */
+  async function attempt(page: Page, password: string) {
+    await page.getByLabel("Password").fill(password);
+    const answered = page.waitForResponse(
+      (res) => res.request().method() === "POST" && res.url().includes("/_serverFn/"),
+    );
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await answered;
+  }
+
+  test("should refuse the sixth sign-in for one email and leave other users alone", async ({ freshPage }) => {
+    const locked = await createUser(freshPage);
+    const other = await createUser(freshPage);
+
+    const page = await freshPage();
+    await gotoApp(page, "/sign-in");
+    await page.getByLabel("Email").fill(locked.email);
+
+    for (let i = 0; i < 5; i++) {
+      await attempt(page, `Wrong-password-${i}`);
+      await expect(page.getByText(wrong)).toBeVisible();
+    }
+
+    // Even the right password is refused now.
+    await attempt(page, locked.password);
+    await expect(page.getByText(refused)).toBeVisible();
+    await expect(page).toHaveURL(/\/sign-in/);
+
+    // Someone else, from the same address, signs in as usual.
+    const otherPage = await signedInPage(freshPage, other);
+    await expect(otherPage.getByText(other.name)).toBeVisible();
+  });
+
+  test("should answer an unknown email the same way as a known one", async ({ freshPage }) => {
+    // The limit applies to the typed email, not to whether it has an account, so the answer reveals nothing.
+    const page = await freshPage();
+    await gotoApp(page, "/sign-in");
+    await page.getByLabel("Email").fill(newTestUser().email);
+
+    for (let i = 0; i < 5; i++) {
+      await attempt(page, `Wrong-password-${i}`);
+      await expect(page.getByText(wrong)).toBeVisible();
+    }
+    await attempt(page, "Wrong-password-6");
+    await expect(page.getByText(refused)).toBeVisible();
+  });
+
+  test("should not count successful sign-ins", async ({ freshPage }) => {
+    const user = await createUser(freshPage);
+    for (let i = 0; i < 7; i++) await signedInPage(freshPage, user);
+  });
+});
