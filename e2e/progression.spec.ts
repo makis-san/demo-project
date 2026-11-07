@@ -46,6 +46,47 @@ test.describe("Progression chart", () => {
     expect(await chartTitles(page)).toEqual([expect.stringMatching(/^1,815 lbs on /)]);
   });
 
+  test("should not show the previous movement's points while the next movement loads", async ({ page }) => {
+    await addMovement(page, "Back Squat");
+    await addMovement(page, "Bench Press");
+    await completeWorkout(page, [
+      { movement: "Back Squat", weight: 200, reps: 5 },
+      { movement: "Bench Press", weight: 100, reps: 5 },
+    ]);
+    await goTo(page, "Workout History");
+    // Movements are listed by name, so the squat chart is the first one shown.
+    await expect(page.getByRole("img", { name: "Max weight for Back Squat over time" })).toBeVisible();
+    expect(await chartTitles(page)).toEqual([expect.stringMatching(/^200 lbs on /)]);
+
+    // Hold back the next movement's data, so the loading state lasts long enough to look at.
+    await page.route("**/_serverFn/**", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue();
+    });
+    await page.getByLabel("Movement", { exact: true }).selectOption({ label: "Bench Press" });
+
+    await expect(page.getByText("Loading...")).toBeVisible();
+    // The squat chart must be gone, not sitting under the bench press name.
+    await expect(page.getByRole("img", { name: /over time$/ })).toHaveCount(0);
+
+    await expect(page.getByRole("img", { name: "Max weight for Bench Press over time" })).toBeVisible();
+    expect(await chartTitles(page)).toEqual([expect.stringMatching(/^100 lbs on /)]);
+  });
+
+  test("should include a workout completed after the chart was first shown", async ({ page }) => {
+    await addMovement(page, "Bench Press");
+    await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
+    await goTo(page, "Workout History");
+    await expect(page.getByRole("img", { name: "Max weight for Bench Press over time" })).toBeVisible();
+    expect(await chartTitles(page)).toEqual([expect.stringMatching(/^100 lbs on /)]);
+
+    // Both workouts are from today, so the point for today now takes the heavier weight.
+    await completeWorkout(page, [{ movement: "Bench Press", weight: 110, reps: 5 }]);
+    await goTo(page, "Workout History");
+
+    await expect(page.getByRole("img", { name: /over time$/ }).locator("circle title")).toHaveText(/^110 lbs on /);
+  });
+
   test("should plot one point per day, and put a late workout on the user's own day", async ({ page, user }) => {
     await addMovement(page, "Bench Press");
     await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
