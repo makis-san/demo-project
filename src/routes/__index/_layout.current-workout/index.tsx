@@ -59,6 +59,12 @@ function CurrentWorkoutPage() {
     }
   };
 
+  // A server function refuses when the page is out of date, for example when another tab already completed the
+  // workout or removed the set. Reload the workout when an action fails too, so the page shows what the server has.
+  // This is onSettled and not onError because a mutation's own onError replaces the one in router.tsx that shows
+  // the toast, and onSettled leaves it alone.
+  const refreshWorkout = () => queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+
   const createWorkoutMutation = useMutation({
     mutationFn: () => createWorkoutServerFn(),
     onSuccess: () => {
@@ -75,11 +81,11 @@ function CurrentWorkoutPage() {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       // A completed workout now belongs in the history page and its charts.
       queryClient.invalidateQueries({ queryKey: workoutHistoryQueryKey });
       queryClient.invalidateQueries({ queryKey: progressionQueryKey });
     },
+    onSettled: refreshWorkout,
   });
 
   const addSetMutation = useMutation({
@@ -88,10 +94,8 @@ function CurrentWorkoutPage() {
       if (!result.success) throw new Error(result.error);
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
-      setReps("");
-    },
+    onSuccess: () => setReps(""),
+    onSettled: refreshWorkout,
   });
 
   const deleteSetMutation = useMutation({
@@ -100,9 +104,7 @@ function CurrentWorkoutPage() {
       if (!result.success) throw new Error(result.error);
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
-    },
+    onSettled: refreshWorkout,
   });
 
   const handleAddSet = (e: React.FormEvent) => {
