@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { deleteWorkoutsServerFn, getWorkoutHistoryServerFn } from "@/lib/workouts.server";
 import { Trash2 } from "lucide-react";
-import { progressionQueryOptions, workoutHistoryQueryOptions } from "./-queries/workout-history";
+import { progressionQueryKey, progressionQueryOptions, workoutHistoryQueryOptions } from "./-queries/workout-history";
 import { ProgressionChart } from "./-progression-chart";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -38,6 +38,7 @@ function WorkoutHistoryPage() {
     mutationFn: (workoutIds: string[]) => deleteWorkoutsServerFn({ data: { workoutIds } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workoutHistoryQueryOptions().queryKey });
+      queryClient.invalidateQueries({ queryKey: progressionQueryKey });
       setSelectedWorkouts(new Set());
     },
   });

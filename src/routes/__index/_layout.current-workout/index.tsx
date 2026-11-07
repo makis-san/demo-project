@@ -14,6 +14,7 @@ import {
 import { Play, Check, Plus, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
+import { progressionQueryKey, workoutHistoryQueryOptions } from "../_layout.workout-history/-queries/workout-history";
 import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
@@ -68,6 +69,9 @@ function CurrentWorkoutPage() {
     mutationFn: () => completeWorkoutServerFn(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+      // A completed workout now belongs in the history page and its charts.
+      queryClient.invalidateQueries({ queryKey: workoutHistoryQueryOptions().queryKey });
+      queryClient.invalidateQueries({ queryKey: progressionQueryKey });
     },
   });
 
