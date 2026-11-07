@@ -10,6 +10,9 @@ async function chartTitles(page: import("@playwright/test").Page) {
 }
 
 test.describe("Progression chart", () => {
+  // The late-workout test below expects Recife dates, so do not depend on the timezone of the machine running it.
+  test.use({ timezoneId: "America/Recife" });
+
   test("should plot each metric for the chosen movement, with two workouts on one day as one point", async ({
     page,
   }) => {
@@ -48,7 +51,7 @@ test.describe("Progression chart", () => {
     await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
     await completeWorkout(page, [{ movement: "Bench Press", weight: 110, reps: 5 }]);
 
-    // 01:30 UTC on Nov 8 is still the evening of Nov 7 in Recife (UTC-3), where this test runs.
+    // 01:30 UTC on Nov 8 is still the evening of Nov 7 in Recife (UTC-3), the timezone set above.
     // Give the two workouts fixed times a week apart, and compare with the same dates in UTC.
     const workouts = await getDb().workout.findMany({
       where: { user: { email: user.email } },
