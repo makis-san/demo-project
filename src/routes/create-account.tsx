@@ -95,6 +95,7 @@ function CreateAccountPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                maxLength={128}
                 autoComplete="new-password"
               />
               <p className="text-xs text-gray-500">Must be at least 6 characters</p>

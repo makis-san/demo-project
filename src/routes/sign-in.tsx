@@ -78,6 +78,7 @@ function SignInPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                maxLength={128}
                 autoComplete="current-password"
               />
             </div>
