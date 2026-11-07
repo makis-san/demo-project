@@ -29,6 +29,20 @@ const config = defineConfig({
   // wasm fallback.
   optimizeDeps: {
     exclude: ["@node-rs/argon2"],
+    // Vite finds these only when the first page is requested. Each discovery
+    // bundles the dependencies again and reloads the page, and requests that are
+    // in flight fail. Listing them makes Vite bundle them at startup. This is the
+    // list Vite prints as "new dependencies optimized" on a fresh container, so
+    // if that line appears again after an upgrade, add what it names.
+    include: [
+      "@tanstack/history",
+      "@tanstack/router-core",
+      "@tanstack/router-core/ssr/client",
+      "@tanstack/router-core/ssr/server",
+      "h3-v2",
+      "seroval",
+      "tiny-invariant",
+    ],
   },
 });
 
