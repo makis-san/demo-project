@@ -6,11 +6,12 @@ import { Select } from "@/components/ui/select";
 import { chartDate, formatDate, shortDate } from "@/lib/dates";
 import type { ProgressionRow } from "@/lib/progression.server";
 import { progressionQueryOptions } from "./-queries/workout-history";
+import { weightUnit } from "@/lib/units";
 
 const metrics = {
-  maxWeight: { label: "Max weight", unit: "lbs", minTickStep: 0 },
+  maxWeight: { label: "Max weight", unit: weightUnit, minTickStep: 0 },
   totalReps: { label: "Total reps", unit: "reps", minTickStep: 1 },
-  totalVolume: { label: "Total volume", unit: "lbs", minTickStep: 0 },
+  totalVolume: { label: "Total volume", unit: weightUnit, minTickStep: 0 },
 } as const satisfies Record<keyof Omit<ProgressionRow, "day">, { label: string; unit: string; minTickStep: number }>;
 
 type Metric = keyof typeof metrics;

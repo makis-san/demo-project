@@ -9,6 +9,7 @@ import { LineChart } from "@/components/ui/line-chart";
 import { addBodyWeightServerFn, deleteBodyWeightServerFn } from "@/lib/body-weight.server";
 import { chartDate, formatDate, shortDate } from "@/lib/dates";
 import { bodyWeightQueryOptions } from "./-queries/body-weight";
+import { weightUnit } from "@/lib/units";
 
 export const Route = createFileRoute("/__index/_layout/body-weight/")({
   loader: async ({ context }) => {
@@ -51,7 +52,7 @@ function BodyWeightPage() {
   const points = entries.map((entry) => ({
     x: new Date(entry.recordedAt).getTime(),
     y: entry.weight,
-    title: `${entry.weight} lbs on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
+    title: `${entry.weight} ${weightUnit} on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
   }));
 
   return (
@@ -66,8 +67,8 @@ function BodyWeightPage() {
           <form onSubmit={handleSubmit} className="flex gap-3 items-center">
             <Input
               type="number"
-              aria-label="Weight in lbs"
-              placeholder="Weight (lbs)"
+              aria-label={`Weight in ${weightUnit}`}
+              placeholder={`Weight (${weightUnit})`}
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               className="w-40"
@@ -103,7 +104,9 @@ function BodyWeightPage() {
                     key={entry.id}
                     className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
                     <div>
-                      <span className="font-medium">{entry.weight} lbs</span>
+                      <span className="font-medium">
+                        {entry.weight} {weightUnit}
+                      </span>
                       <span className="text-slate-500 ml-2">{formatDate(entry.recordedAt, timeZone, shortDate)}</span>
                     </div>
                     <Button

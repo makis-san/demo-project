@@ -16,6 +16,7 @@ import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
 import { progressionQueryKey, workoutHistoryQueryOptions } from "../_layout.workout-history/-queries/workout-history";
 import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
+import { weightUnit } from "@/lib/units";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
@@ -205,7 +206,7 @@ function CurrentWorkoutPage() {
                   <div>
                     <span className="font-medium">{set.movement.name}</span>
                     <span className="text-slate-500 ml-2">
-                      {set.reps} reps × {set.weight} lbs
+                      {set.reps} reps × {set.weight} {weightUnit}
                     </span>
                   </div>
                   <Button

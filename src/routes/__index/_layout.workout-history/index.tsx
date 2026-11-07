@@ -8,6 +8,7 @@ import { Trash2 } from "lucide-react";
 import { progressionQueryKey, progressionQueryOptions, workoutHistoryQueryOptions } from "./-queries/workout-history";
 import { ProgressionChart } from "./-progression-chart";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { weightUnit } from "@/lib/units";
 
 export const Route = createFileRoute("/__index/_layout/workout-history/")({
   loader: async ({ context }) => {
@@ -161,7 +162,7 @@ function WorkoutHistoryPage() {
                           const numSets = movementSets.length;
                           return (
                             <td key={movementId} className="py-3 px-4 text-right text-slate-600">
-                              {maxWeight} lbs / {avgReps} reps / {numSets} sets
+                              {maxWeight} {weightUnit} / {avgReps} reps / {numSets} sets
                             </td>
                           );
                         })}
