@@ -32,6 +32,7 @@ model Workout {
   userId      String
   user        User      @relation(fields: [userId], references: [id])
   id          String    @id @default(uuid())
+  startedAt   DateTime  @default(now())
   completedAt DateTime?
   sets        Set[]
 }

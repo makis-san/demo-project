@@ -101,7 +101,7 @@ function CurrentWorkoutPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {new Date().toLocaleDateString("en-US", {
+            {new Date(workout.startedAt).toLocaleDateString("en-US", {
               weekday: "long",
               year: "numeric",
               month: "long",
