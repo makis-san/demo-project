@@ -20,11 +20,13 @@ model User {
 }
 
 model Movement {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-  name   String
-  sets   Set[]
+  id           String  @id @default(uuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id])
+  name         String
+  // Pull-ups, push-ups and dips: the weight field starts at the user's body weight.
+  isBodyWeight Boolean @default(false)
+  sets         Set[]
 
   @@unique([userId, name])
 }
