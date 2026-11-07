@@ -8,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String       @id @default(uuid())
+  email        String       @unique
   name         String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   passwordHash String
   workouts     Workout[]
   movements    Movement[]
+  bodyWeights  BodyWeight[]
 }
 
 model Movement {
@@ -46,4 +47,14 @@ model Set {
   reps       Int
   weight     Decimal  @db.Decimal(6, 2)
   createdAt  DateTime @default(now())
+}
+
+model BodyWeight {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  weight     Decimal  @db.Decimal(6, 2)
+  recordedAt DateTime @default(now())
+
+  @@index([userId, recordedAt])
 }

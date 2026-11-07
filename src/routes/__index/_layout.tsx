@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Dumbbell, History, BicepsFlexed, User, LogOut } from "lucide-react";
+import { Dumbbell, History, BicepsFlexed, Scale, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/__index/_layout")({
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/current-workout", label: "Current Workout", icon: Dumbbell },
   { to: "/workout-history", label: "Workout History", icon: History },
   { to: "/movements", label: "Movements", icon: BicepsFlexed },
+  { to: "/body-weight", label: "Body Weight", icon: Scale },
 ] as const;
 
 function RouteComponent() {
