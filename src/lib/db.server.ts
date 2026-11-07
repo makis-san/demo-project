@@ -14,3 +14,8 @@ export const getServerSidePrismaClient = async () => {
   }
   return _prismaClient;
 };
+
+/** True for Prisma's P2002 error: a unique constraint or unique index was violated. */
+export function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient, isUniqueViolation } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
 import { errorMiddleware } from "@/lib/errors.server";
 import { repsSchema, weightSchema } from "@/lib/validation";
@@ -9,43 +9,59 @@ import { z } from "zod";
 // createdAt alone can tie for sets added in the same millisecond, so id breaks the tie.
 const setOrder = [{ createdAt: "asc" as const }, { id: "asc" as const }];
 
+type DbClient = Awaited<ReturnType<typeof getServerSidePrismaClient>>;
+
+/**
+ * The user's one active workout, or null. A unique index allows at most one
+ * per user, so no ordering is needed to pick between several.
+ */
+function findActiveWorkout(prisma: DbClient, userId: string) {
+  return prisma.workout.findFirst({
+    where: { userId, completedAt: null },
+    include: {
+      sets: {
+        include: { movement: true },
+        orderBy: setOrder,
+      },
+    },
+  });
+}
+
+type ActiveWorkout = NonNullable<Awaited<ReturnType<typeof findActiveWorkout>>>;
+
+function toClientWorkout(workout: ActiveWorkout) {
+  return { ...workout, sets: workout.sets.map(withNumberWeight) };
+}
+
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    const workout = await prisma.workout.create({
-      data: {
-        userId: context.user.id,
-      },
-    });
-    return { success: true, workout };
+    try {
+      await prisma.workout.create({ data: { userId: context.user.id } });
+    } catch (error) {
+      // The unique index on active workouts rejected a second one, for example
+      // from a double click or a second tab. The existing one is what the user wants.
+      if (!isUniqueViolation(error)) throw error;
+    }
+    const workout = await findActiveWorkout(prisma, context.user.id);
+    if (!workout) throw new Error("Active workout not found after creating it");
+    return { success: true, workout: toClientWorkout(workout) };
   });
 
 export const getCurrentWorkoutServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    // Get the most recent workout for the user
-    const workout = await prisma.workout.findFirst({
-      where: { userId: context.user.id, completedAt: null },
-      orderBy: { id: "desc" },
-      include: {
-        sets: {
-          include: { movement: true },
-          orderBy: setOrder,
-        },
-      },
-    });
-    return workout && { ...workout, sets: workout.sets.map(withNumberWeight) };
+    const workout = await findActiveWorkout(prisma, context.user.id);
+    return workout && toClientWorkout(workout);
   });
 
 export const completeWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    const workout = await prisma.workout.findFirst({
-      where: { userId: context.user.id, completedAt: null },
-    });
+    const workout = await findActiveWorkout(prisma, context.user.id);
     if (!workout) {
       return { success: false, error: "No active workout to complete" };
     }
@@ -68,9 +84,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       data: { movementId: string; reps: number; weight: number };
     }) => {
       const prisma = await getServerSidePrismaClient();
-      const workout = await prisma.workout.findFirst({
-        where: { userId: context.user.id, completedAt: null },
-      });
+      const workout = await findActiveWorkout(prisma, context.user.id);
       if (!workout) {
         return { success: false, error: "No active workout" };
       }
