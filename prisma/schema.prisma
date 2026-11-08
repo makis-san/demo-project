@@ -8,22 +8,25 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String       @id @default(uuid())
+  email        String       @unique
   name         String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   passwordHash String
   workouts     Workout[]
   movements    Movement[]
+  bodyWeights  BodyWeight[]
 }
 
 model Movement {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-  name   String
-  sets   Set[]
+  id           String  @id @default(uuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id])
+  name         String
+  // Pull-ups, push-ups and dips: the weight field starts at the user's body weight.
+  isBodyWeight Boolean @default(false)
+  sets         Set[]
 
   @@unique([userId, name])
 }
@@ -35,6 +38,8 @@ model Workout {
   startedAt   DateTime  @default(now())
   completedAt DateTime?
   sets        Set[]
+
+  @@index([userId, completedAt])
 }
 
 model Set {
@@ -46,4 +51,17 @@ model Set {
   reps       Int
   weight     Decimal  @db.Decimal(6, 2)
   createdAt  DateTime @default(now())
+
+  @@index([workoutId])
+  @@index([movementId])
+}
+
+model BodyWeight {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  weight     Decimal  @db.Decimal(6, 2)
+  recordedAt DateTime @default(now())
+
+  @@index([userId, recordedAt])
 }
