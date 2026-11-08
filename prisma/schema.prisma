@@ -17,6 +17,21 @@ model User {
   workouts     Workout[]
   movements    Movement[]
   bodyWeights  BodyWeight[]
+  sessions     Session[]
+}
+
+// A signed-in browser. The cookie holds a random token, and only its SHA-256 is
+// stored, so a copy of this table cannot be used to sign in. Deleting the row
+// signs that browser out.
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 model Movement {
