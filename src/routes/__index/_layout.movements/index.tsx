@@ -52,6 +52,7 @@ function MovementsPage() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="flex gap-3">
               <Input
+                aria-label="Movement name"
                 placeholder="Movement name (e.g. Bench Press)"
                 value={name}
                 onChange={(e) => setName(e.target.value)}

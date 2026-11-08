@@ -10,8 +10,11 @@ export const workoutHistoryQueryOptions = () =>
 
 // The server groups days in the user's timezone, so the timezone is part of the
 // key. When the browser sets its timezone cookie the key changes and the data is fetched again.
+// Starts every progression key, so invalidating it refreshes the chart for any movement.
+export const progressionQueryKey = ["progression"] as const;
+
 export const progressionQueryOptions = (movementId: string, timeZone: string) =>
   queryOptions({
-    queryKey: ["progression", movementId, timeZone],
+    queryKey: [...progressionQueryKey, movementId, timeZone],
     queryFn: () => getProgressionServerFn({ data: { movementId } }),
   });

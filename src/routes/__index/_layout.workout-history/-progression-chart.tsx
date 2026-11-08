@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart } from "@/components/ui/line-chart";
 import { Select } from "@/components/ui/select";
@@ -29,10 +29,9 @@ export function ProgressionChart({
   const [metric, setMetric] = useState<Metric>("maxWeight");
   const movement = movements.find((m) => m.id === movementId) ?? movements[0];
 
-  const { data: rows } = useQuery({
-    ...progressionQueryOptions(movement.id, timeZone),
-    placeholderData: keepPreviousData,
-  });
+  // No placeholder data: while another movement loads, the old movement's chart
+  // would sit under the new movement's name.
+  const { data: rows } = useQuery(progressionQueryOptions(movement.id, timeZone));
 
   const { label, unit, minTickStep } = metrics[metric];
   // A day is a plain date already in the user's timezone, so read it as UTC to format it as that same date.
