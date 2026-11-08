@@ -9,6 +9,7 @@ import { LineChart } from "@/components/ui/line-chart";
 import { addBodyWeightServerFn, deleteBodyWeightServerFn } from "@/lib/body-weight.server";
 import { chartDate, formatDate, shortDate } from "@/lib/dates";
 import { bodyWeightQueryOptions } from "./-queries/body-weight";
+import { weightUnit } from "@/lib/units";
 
 export const Route = createFileRoute("/__index/_layout/body-weight/")({
   loader: async ({ context }) => {
@@ -51,7 +52,7 @@ function BodyWeightPage() {
   const points = entries.map((entry) => ({
     x: new Date(entry.recordedAt).getTime(),
     y: entry.weight,
-    title: `${entry.weight} lbs on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
+    title: `${entry.weight} ${weightUnit} on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
   }));
 
   return (
@@ -63,19 +64,20 @@ function BodyWeightPage() {
           <CardTitle>Log Body Weight</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex gap-3 items-center">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               type="number"
-              aria-label="Weight in lbs"
-              placeholder="Weight (lbs)"
+              aria-label={`Weight in ${weightUnit}`}
+              placeholder={`Weight (${weightUnit})`}
+              inputMode="decimal"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              className="w-40"
+              className="sm:w-40"
               min={0.01}
               max={9999.99}
               step="0.01"
             />
-            <Button type="submit" disabled={!(parseFloat(weight) > 0)}>
+            <Button type="submit" disabled={!(parseFloat(weight) > 0)} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-1" />
               {addMutation.isPending ? "Saving..." : "Log weight"}
             </Button>
@@ -103,7 +105,9 @@ function BodyWeightPage() {
                     key={entry.id}
                     className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
                     <div>
-                      <span className="font-medium">{entry.weight} lbs</span>
+                      <span className="font-medium">
+                        {entry.weight} {weightUnit}
+                      </span>
                       <span className="text-slate-500 ml-2">{formatDate(entry.recordedAt, timeZone, shortDate)}</span>
                     </div>
                     <Button
@@ -111,7 +115,7 @@ function BodyWeightPage() {
                       size="icon"
                       aria-label="Delete entry"
                       onClick={() => deleteMutation.mutate(entry.id)}
-                      className="h-8 w-8 text-slate-400">
+                      className="h-10 w-10 text-slate-400 sm:h-8 sm:w-8">
                       <X className="w-4 h-4" />
                     </Button>
                   </li>

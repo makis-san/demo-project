@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../prisma/generated/client/client";
@@ -40,4 +40,52 @@ export async function breakWrites(
     await db.$executeRawUnsafe(`DROP TRIGGER ${name} ON "${table}"`);
     await db.$executeRawUnsafe(`DROP FUNCTION ${name}()`);
   };
+}
+
+export type SeedWorkout = {
+  /** Set it to control how workouts with the same completedAt are ordered. */
+  id?: string;
+  completedAt: Date;
+  sets?: { movement: string; weight: number; reps: number }[];
+};
+
+/**
+ * Completed workouts made straight in the database. History shows 20 at a time, and completing that many
+ * through the UI would make the test slow without testing anything more. Movements are created as needed.
+ * Returns the workout ids in the order given.
+ */
+export async function seedCompletedWorkouts(email: string, workouts: SeedWorkout[]) {
+  const db = getDb();
+  const user = await db.user.findUniqueOrThrow({ where: { email } });
+
+  const movementIds = new Map<string, string>();
+  for (const name of new Set(workouts.flatMap((w) => (w.sets ?? []).map((s) => s.movement)))) {
+    const movement = await db.movement.upsert({
+      where: { userId_name: { userId: user.id, name } },
+      update: {},
+      create: { userId: user.id, name },
+    });
+    movementIds.set(name, movement.id);
+  }
+
+  const ids = workouts.map((w) => w.id ?? randomUUID());
+  await db.workout.createMany({
+    data: workouts.map((w, i) => ({
+      id: ids[i],
+      userId: user.id,
+      startedAt: w.completedAt,
+      completedAt: w.completedAt,
+    })),
+  });
+  await db.set.createMany({
+    data: workouts.flatMap((w, i) =>
+      (w.sets ?? []).map((s) => ({
+        workoutId: ids[i],
+        movementId: movementIds.get(s.movement)!,
+        weight: s.weight,
+        reps: s.reps,
+      })),
+    ),
+  });
+  return ids;
 }

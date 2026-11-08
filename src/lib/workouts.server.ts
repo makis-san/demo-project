@@ -124,13 +124,41 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
     return { success: true as const };
   });
 
+/** How many completed workouts one page of history holds. */
+export const historyPageSize = 20;
+
+/** Where the next page starts: the last workout of the page before it. */
+const historyCursorSchema = z.object({ completedAt: z.coerce.date(), id: z.string() });
+export type HistoryCursor = z.infer<typeof historyCursorSchema>;
+
+/**
+ * One page of the user's completed workouts, newest first.
+ *
+ * The order is `completedAt` and then `id`, because two workouts can be
+ * completed in the same millisecond and the order must be the same every time
+ * the query runs. The cursor is the (completedAt, id) of the last workout of the
+ * previous page, and the page is everything after it in that order. So a workout
+ * is never listed twice or skipped, even when several share one `completedAt`,
+ * and a workout completed in between does not shift the following pages.
+ *
+ * One extra row is read to know whether there is a next page.
+ */
 export const getWorkoutHistoryServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
-  .handler(async ({ context }) => {
+  .inputValidator(z.object({ cursor: historyCursorSchema.nullable() }))
+  .handler(async ({ context, data }: { context: { user: { id: string } }; data: { cursor: HistoryCursor | null } }) => {
     const prisma = await getServerSidePrismaClient();
-    const workouts = await prisma.workout.findMany({
-      where: { userId: context.user.id, completedAt: { not: null } },
-      orderBy: { completedAt: "desc" },
+    const { cursor } = data;
+    const rows = await prisma.workout.findMany({
+      where: {
+        userId: context.user.id,
+        completedAt: { not: null },
+        ...(cursor && {
+          OR: [{ completedAt: { lt: cursor.completedAt } }, { completedAt: cursor.completedAt, id: { lt: cursor.id } }],
+        }),
+      },
+      orderBy: [{ completedAt: "desc" }, { id: "desc" }],
+      take: historyPageSize + 1,
       include: {
         sets: {
           include: { movement: true },
@@ -138,7 +166,35 @@ export const getWorkoutHistoryServerFn = createServerFn()
         },
       },
     });
-    return workouts.map((workout) => ({ ...workout, sets: workout.sets.map(withNumberWeight) }));
+
+    const hasMore = rows.length > historyPageSize;
+    const workouts = rows.slice(0, historyPageSize).map((workout) => ({
+      ...workout,
+      sets: workout.sets.map(withNumberWeight),
+    }));
+    const last = workouts.at(-1);
+    const nextCursor: HistoryCursor | null =
+      hasMore && last?.completedAt ? { completedAt: last.completedAt, id: last.id } : null;
+    return { workouts, nextCursor };
+  });
+
+/**
+ * Every movement that is in a completed workout, by name. The history page uses it for the columns
+ * of the table and the chart's movement list. It cannot come from the pages, because they hold only
+ * the newest workouts.
+ */
+export const getHistoryMovementsServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }) => {
+    const prisma = await getServerSidePrismaClient();
+    const movements = await prisma.movement.findMany({
+      where: {
+        userId: context.user.id,
+        sets: { some: { workout: { completedAt: { not: null } } } },
+      },
+      select: { id: true, name: true },
+    });
+    return movements.sort((a, b) => a.name.localeCompare(b.name));
   });
 
 export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })

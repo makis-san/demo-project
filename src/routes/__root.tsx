@@ -170,7 +170,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         {config.environment === "development" && (
           <TanStackDevtools
             config={{
-              position: "bottom-left",
+              // Not at the bottom: on a phone that corner is the first tab of the navigation bar.
+              position: "middle-left",
             }}
             plugins={[
               {

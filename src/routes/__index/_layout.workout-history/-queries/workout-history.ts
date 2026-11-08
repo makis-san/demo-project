@@ -1,11 +1,24 @@
-import { getWorkoutHistoryServerFn } from "@/lib/workouts.server";
+import { getHistoryMovementsServerFn, getWorkoutHistoryServerFn, type HistoryCursor } from "@/lib/workouts.server";
 import { getProgressionServerFn } from "@/lib/progression.server";
-import { queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
+// Starts every history key, so invalidating it refreshes the pages and the movement list together.
+export const workoutHistoryQueryKey = ["workout-history"] as const;
+
+// One entry per page. Refetching asks for the first page again and works out where each next page
+// starts from the page before it, so a workout completed or deleted meanwhile does not skip or repeat one.
 export const workoutHistoryQueryOptions = () =>
+  infiniteQueryOptions({
+    queryKey: [...workoutHistoryQueryKey, "pages"],
+    queryFn: ({ pageParam }) => getWorkoutHistoryServerFn({ data: { cursor: pageParam } }),
+    initialPageParam: null as HistoryCursor | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+
+export const historyMovementsQueryOptions = () =>
   queryOptions({
-    queryKey: ["workout-history"],
-    queryFn: () => getWorkoutHistoryServerFn(),
+    queryKey: [...workoutHistoryQueryKey, "movements"],
+    queryFn: () => getHistoryMovementsServerFn(),
   });
 
 // The server groups days in the user's timezone, so the timezone is part of the
