@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createAccountServerFn } from "@/lib/auth.server";
+import { errorMessage } from "@/lib/error-message";
 
 export const Route = createFileRoute("/create-account")({
   beforeLoad: ({ context }) => {
@@ -36,7 +37,7 @@ function CreateAccountPage() {
       }
     } catch (error) {
       console.error("Error creating account", error);
-      setError("An unexpected error occurred");
+      setError(errorMessage(error));
     } finally {
       setIsLoading(false);
     }

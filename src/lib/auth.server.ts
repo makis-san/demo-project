@@ -3,80 +3,99 @@ import { redirect } from "@tanstack/react-router";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createMiddleware, createServerFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
-import { getServerSidePrismaClient } from "./db.server";
+import { configService } from "./config.server";
+import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
+import { errorMiddleware } from "./errors.server";
+import { emailSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
+import {
+  clientAddress,
+  giveBackSignInAttempt,
+  giveBackSignUpAttempt,
+  takeSignInAttempt,
+  takeSignUpAttempt,
+} from "./rate-limit.server";
 
-// In production, use a proper secret from environment variables
-const COOKIE_SECRET = process.env.COOKIE_SECRET || "dev-secret-change-in-production";
+// The same answer whether or not the email has an account, so it reveals nothing about accounts.
+const tooManyAttempts = { success: false as const, error: "Too many attempts. Try again in a few minutes." };
 
-/**
- * Signs a user ID to create a tamper-proof session token
- */
-function signUserId(userId: string): string {
-  const signature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  return `${userId}.${signature}`;
-}
-
-/**
- * Verifies a signed session token and returns the user ID if valid
- */
-function verifySessionToken(token: string): string | null {
-  const [userId, signature] = token.split(".");
-  if (!userId || !signature) return null;
-
-  const expectedSignature = crypto.createHmac("sha256", COOKIE_SECRET).update(userId).digest("hex");
-  if (signature !== expectedSignature) return null;
-
-  return userId;
-}
+const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
- * Sets the session cookie for a user (internal use only)
+ * Secure keeps the cookie off plain HTTP. It is on unless ENVIRONMENT says
+ * development, so a deployment that forgets to set it gets the safe flag, and
+ * localhost keeps working without HTTPS.
  */
-function setSessionCookie(userId: string) {
-  const token = signUserId(userId);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-  setCookie(sessionCookieName, token, {
+function cookieOptions() {
+  return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    expires: expiresAt,
-  });
+    secure: configService.getAppConfig().environment !== "development",
+    sameSite: "lax" as const,
+  };
 }
 
 /**
- * Gets the current user from session cookie
+ * What the database stores for a session token. The token is 32 random bytes,
+ * so it cannot be guessed and a fast hash is enough. A slow one like argon2 is
+ * for passwords, which people choose and can be guessed.
+ */
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Signs the user in on this browser: stores a new session and sets the cookie.
+ * Every call makes a new random token, so a token seen before sign-in is never
+ * reused afterwards.
+ */
+async function startSession(userId: string) {
+  const prisma = await getServerSidePrismaClient();
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + sessionLifetimeMs);
+
+  await prisma.session.create({ data: { tokenHash: hashToken(token), userId, expiresAt } });
+  // Expired rows are already refused by the lookup below, this only keeps the table small.
+  await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+
+  setCookie(sessionCookieName, token, { ...cookieOptions(), expires: expiresAt });
+}
+
+/**
+ * Gets the current user from session cookie. The root route calls it on every
+ * page load, so it needs the error middleware too: without it a database error
+ * went to the browser, in the response and in the HTML of the page.
  * @returns User object or null if not logged in
  */
-export const getUserServerFn = createServerFn().handler(async () => {
-  const sessionToken = getCookie(sessionCookieName);
-  if (!sessionToken) {
-    return null;
-  }
+export const getUserServerFn = createServerFn()
+  .middleware([errorMiddleware])
+  .handler(async () => {
+    const token = getCookie(sessionCookieName);
+    if (!token) {
+      return null;
+    }
 
-  const userId = verifySessionToken(sessionToken);
-  if (!userId) {
-    return null;
-  }
+    const prisma = await getServerSidePrismaClient();
+    const session = await prisma.session.findFirst({
+      where: { tokenHash: hashToken(token), expiresAt: { gt: new Date() } },
+      select: { user: { select: { id: true, email: true, name: true } } },
+    });
 
-  const prisma = await getServerSidePrismaClient();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true },
+    return session?.user ?? null;
   });
-
-  return user;
-});
 
 /**
  * Signs in a user with email and password
  */
 export const signInServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.string().email(), password: z.string().max(128) }))
+  .middleware([errorMiddleware])
+  .inputValidator(z.object({ email: emailSchema, password: z.string().max(128) }))
   .handler(async ({ data }: { data: { email: string; password: string } }) => {
     const { email, password } = data;
+
+    // Before any work is done, so refused attempts cost nothing.
+    const ip = clientAddress();
+    if (!takeSignInAttempt(ip, email)) return tooManyAttempts;
 
     const prisma = await getServerSidePrismaClient();
     const user = await prisma.user.findUnique({
@@ -92,7 +111,8 @@ export const signInServerFn = createServerFn({ method: "POST" })
       return { success: false as const, error: "Invalid email or password" };
     }
 
-    setSessionCookie(user.id);
+    giveBackSignInAttempt(ip, email);
+    await startSession(user.id);
 
     return { success: true as const };
   });
@@ -101,36 +121,61 @@ export const signInServerFn = createServerFn({ method: "POST" })
  * Creates a new user account
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ email: z.email(), name: z.string().min(1), password: z.string().min(6).max(128) }))
+  .middleware([errorMiddleware])
+  .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: z.string().min(6).max(128) }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
 
+    const ip = clientAddress();
+    if (!takeSignUpAttempt(ip)) return tooManyAttempts;
+
     const prisma = await getServerSidePrismaClient();
 
+    const emailTaken = { success: false as const, error: "An account with this email already exists" };
+
+    // Looking first avoids hashing a password for an email that is taken. Two
+    // requests can still pass this check together, so the unique index has the
+    // final say and its violation gets the same answer.
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      return { success: false as const, error: "An account with this email already exists" };
+      return emailTaken;
     }
 
-    const user = await prisma.user.create({
-      data: { email, name, passwordHash: await hashPassword(password) },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: { email, name, passwordHash: await hashPassword(password) },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) return emailTaken;
+      throw error;
+    }
 
-    setSessionCookie(user.id);
+    giveBackSignUpAttempt(ip);
+    await startSession(user.id);
 
     return { success: true as const };
   });
 
 /**
- * Logs out the current user
+ * Logs out the current user. A POST made by the Log out button. There is no
+ * page for it, so opening a URL cannot sign anyone out.
  */
-export const logoutServerFn = createServerFn({ method: "POST" }).handler(async () => {
-  deleteCookie(sessionCookieName);
-  return { success: true };
-});
+export const logoutServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware])
+  .handler(async () => {
+    const token = getCookie(sessionCookieName);
+    if (token) {
+      // Deleting the row is what signs out: a copy of the token stops working too.
+      const prisma = await getServerSidePrismaClient();
+      await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
+    }
+    deleteCookie(sessionCookieName, cookieOptions());
+    return { success: true };
+  });
 
 /**
  * Authentication middleware that ensures user is logged in

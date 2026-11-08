@@ -11,7 +11,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "format": "prettier --write .",
-    "typecheck": "tsr generate && tsc --noEmit",
+    "typecheck": "tsr generate && tsc --noEmit && tsc --noEmit -p e2e",
     "generate": "prisma generate",
     "postinstall": "prisma generate",
     "prepare": "husky",

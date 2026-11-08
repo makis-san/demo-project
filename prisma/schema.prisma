@@ -8,22 +8,40 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String       @id @default(uuid())
+  email        String       @unique
   name         String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   passwordHash String
   workouts     Workout[]
   movements    Movement[]
+  bodyWeights  BodyWeight[]
+  sessions     Session[]
+}
+
+// A signed-in browser. The cookie holds a random token, and only its SHA-256 is
+// stored, so a copy of this table cannot be used to sign in. Deleting the row
+// signs that browser out.
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 model Movement {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-  name   String
-  sets   Set[]
+  id           String  @id @default(uuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id])
+  name         String
+  // Pull-ups, push-ups and dips: the weight field starts at the user's body weight.
+  isBodyWeight Boolean @default(false)
+  sets         Set[]
 
   @@unique([userId, name])
 }
@@ -35,15 +53,31 @@ model Workout {
   startedAt   DateTime  @default(now())
   completedAt DateTime?
   sets        Set[]
+
+  @@index([userId, completedAt])
 }
 
 model Set {
   id         String   @id @default(uuid())
   workoutId  String
-  workout    Workout  @relation(fields: [workoutId], references: [id])
+  // A set cannot exist without its workout, so the database removes them together.
+  workout    Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   movementId String
   movement   Movement @relation(fields: [movementId], references: [id])
   reps       Int
   weight     Decimal  @db.Decimal(6, 2)
   createdAt  DateTime @default(now())
+
+  @@index([workoutId])
+  @@index([movementId])
+}
+
+model BodyWeight {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  weight     Decimal  @db.Decimal(6, 2)
+  recordedAt DateTime @default(now())
+
+  @@index([userId, recordedAt])
 }

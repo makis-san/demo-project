@@ -63,13 +63,13 @@ export const completeWorkoutServerFn = createServerFn({ method: "POST" })
     const prisma = await getServerSidePrismaClient();
     const workout = await findActiveWorkout(prisma, context.user.id);
     if (!workout) {
-      return { success: false, error: "No active workout to complete" };
+      return { success: false as const, error: "No active workout to complete" };
     }
     await prisma.workout.update({
       where: { id: workout.id },
       data: { completedAt: new Date() },
     });
-    return { success: true };
+    return { success: true as const };
   });
 
 export const addSetServerFn = createServerFn({ method: "POST" })
@@ -86,14 +86,14 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       const prisma = await getServerSidePrismaClient();
       const workout = await findActiveWorkout(prisma, context.user.id);
       if (!workout) {
-        return { success: false, error: "No active workout" };
+        return { success: false as const, error: "No active workout" };
       }
       const movement = await prisma.movement.findFirst({
         where: { id: data.movementId, userId: context.user.id },
         select: { id: true },
       });
       if (!movement) {
-        return { success: false, error: "Movement not found" };
+        return { success: false as const, error: "Movement not found" };
       }
       const set = await prisma.set.create({
         data: {
@@ -104,7 +104,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
         },
         include: { movement: true },
       });
-      return { success: true, set: withNumberWeight(set) };
+      return { success: true as const, set: withNumberWeight(set) };
     },
   );
 
@@ -118,19 +118,47 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
       where: { id: data.setId, workout: { userId: context.user.id, completedAt: null } },
     });
     if (!set) {
-      return { success: false, error: "Set not found" };
+      return { success: false as const, error: "Set not found" };
     }
     await prisma.set.delete({ where: { id: data.setId } });
-    return { success: true };
+    return { success: true as const };
   });
 
+/** How many completed workouts one page of history holds. */
+export const historyPageSize = 20;
+
+/** Where the next page starts: the last workout of the page before it. */
+const historyCursorSchema = z.object({ completedAt: z.coerce.date(), id: z.string() });
+export type HistoryCursor = z.infer<typeof historyCursorSchema>;
+
+/**
+ * One page of the user's completed workouts, newest first.
+ *
+ * The order is `completedAt` and then `id`, because two workouts can be
+ * completed in the same millisecond and the order must be the same every time
+ * the query runs. The cursor is the (completedAt, id) of the last workout of the
+ * previous page, and the page is everything after it in that order. So a workout
+ * is never listed twice or skipped, even when several share one `completedAt`,
+ * and a workout completed in between does not shift the following pages.
+ *
+ * One extra row is read to know whether there is a next page.
+ */
 export const getWorkoutHistoryServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
-  .handler(async ({ context }) => {
+  .inputValidator(z.object({ cursor: historyCursorSchema.nullable() }))
+  .handler(async ({ context, data }: { context: { user: { id: string } }; data: { cursor: HistoryCursor | null } }) => {
     const prisma = await getServerSidePrismaClient();
-    const workouts = await prisma.workout.findMany({
-      where: { userId: context.user.id, completedAt: { not: null } },
-      orderBy: { completedAt: "desc" },
+    const { cursor } = data;
+    const rows = await prisma.workout.findMany({
+      where: {
+        userId: context.user.id,
+        completedAt: { not: null },
+        ...(cursor && {
+          OR: [{ completedAt: { lt: cursor.completedAt } }, { completedAt: cursor.completedAt, id: { lt: cursor.id } }],
+        }),
+      },
+      orderBy: [{ completedAt: "desc" }, { id: "desc" }],
+      take: historyPageSize + 1,
       include: {
         sets: {
           include: { movement: true },
@@ -138,7 +166,35 @@ export const getWorkoutHistoryServerFn = createServerFn()
         },
       },
     });
-    return workouts.map((workout) => ({ ...workout, sets: workout.sets.map(withNumberWeight) }));
+
+    const hasMore = rows.length > historyPageSize;
+    const workouts = rows.slice(0, historyPageSize).map((workout) => ({
+      ...workout,
+      sets: workout.sets.map(withNumberWeight),
+    }));
+    const last = workouts.at(-1);
+    const nextCursor: HistoryCursor | null =
+      hasMore && last?.completedAt ? { completedAt: last.completedAt, id: last.id } : null;
+    return { workouts, nextCursor };
+  });
+
+/**
+ * Every movement that is in a completed workout, by name. The history page uses it for the columns
+ * of the table and the chart's movement list. It cannot come from the pages, because they hold only
+ * the newest workouts.
+ */
+export const getHistoryMovementsServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }) => {
+    const prisma = await getServerSidePrismaClient();
+    const movements = await prisma.movement.findMany({
+      where: {
+        userId: context.user.id,
+        sets: { some: { workout: { completedAt: { not: null } } } },
+      },
+      select: { id: true, name: true },
+    });
+    return movements.sort((a, b) => a.name.localeCompare(b.name));
   });
 
 export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
@@ -146,10 +202,8 @@ export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
   .inputValidator(z.object({ workoutIds: z.array(z.string()) }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { workoutIds: string[] } }) => {
     const prisma = await getServerSidePrismaClient();
-    // Delete sets first, then workouts (only for this user's workouts)
-    await prisma.set.deleteMany({
-      where: { workout: { id: { in: data.workoutIds }, userId: context.user.id } },
-    });
+    // Only this user's workouts. Their sets are removed by the database in the same statement
+    // (ON DELETE CASCADE), so a failure cannot leave a workout without its sets.
     await prisma.workout.deleteMany({
       where: { id: { in: data.workoutIds }, userId: context.user.id },
     });

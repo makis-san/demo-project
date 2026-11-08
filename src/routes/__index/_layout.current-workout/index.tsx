@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { formatDate, fullDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,24 +14,56 @@ import {
 import { Play, Check, Plus, X } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
+import { progressionQueryKey, workoutHistoryQueryKey } from "../_layout.workout-history/-queries/workout-history";
+import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
+import { weightUnit } from "@/lib/units";
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(currentWorkoutQueryOptions()),
       context.queryClient.ensureQueryData(movementsQueryOptions()),
+      context.queryClient.ensureQueryData(latestBodyWeightQueryOptions()),
     ]);
   },
   component: CurrentWorkoutPage,
 });
 
 function CurrentWorkoutPage() {
+  const { timeZone } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const { data: workout } = useSuspenseQuery(currentWorkoutQueryOptions());
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
+  const { data: latestBodyWeight } = useSuspenseQuery(latestBodyWeightQueryOptions());
   const [selectedMovement, setSelectedMovement] = useState("");
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
+  // True while the weight field holds the body weight we filled in, not something the user typed.
+  const [weightIsBodyWeight, setWeightIsBodyWeight] = useState(false);
+
+  const selected = movements.find((m) => m.id === selectedMovement);
+  const needsBodyWeight = !!selected?.isBodyWeight && latestBodyWeight === null;
+
+  const handleMovementChange = (movementId: string) => {
+    setSelectedMovement(movementId);
+    const movement = movements.find((m) => m.id === movementId);
+    if (movement?.isBodyWeight && latestBodyWeight !== null) {
+      // Keep a weight the user typed, for example the added weight on dips.
+      if (weight === "" || weightIsBodyWeight) {
+        setWeight(String(latestBodyWeight));
+        setWeightIsBodyWeight(true);
+      }
+    } else if (weightIsBodyWeight) {
+      setWeight("");
+      setWeightIsBodyWeight(false);
+    }
+  };
+
+  // A server function refuses when the page is out of date, for example when another tab already completed the
+  // workout or removed the set. Reload the workout when an action fails too, so the page shows what the server has.
+  // This is onSettled and not onError because a mutation's own onError replaces the one in router.tsx that shows
+  // the toast, and onSettled leaves it alone.
+  const refreshWorkout = () => queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
 
   const createWorkoutMutation = useMutation({
     mutationFn: () => createWorkoutServerFn(),
@@ -39,26 +72,39 @@ function CurrentWorkoutPage() {
     },
   });
 
+  // A server function answers { success: false, error } for failures it expects. Throwing here makes the
+  // mutation fail, so the toast in router.tsx shows the message, and onSuccess does not run.
   const completeWorkoutMutation = useMutation({
-    mutationFn: () => completeWorkoutServerFn(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    mutationFn: async () => {
+      const result = await completeWorkoutServerFn();
+      if (!result.success) throw new Error(result.error);
+      return result;
     },
+    onSuccess: () => {
+      // A completed workout now belongs in the history page and its charts.
+      queryClient.invalidateQueries({ queryKey: workoutHistoryQueryKey });
+      queryClient.invalidateQueries({ queryKey: progressionQueryKey });
+    },
+    onSettled: refreshWorkout,
   });
 
   const addSetMutation = useMutation({
-    mutationFn: (data: { movementId: string; reps: number; weight: number }) => addSetServerFn({ data }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
-      setReps("");
+    mutationFn: async (data: { movementId: string; reps: number; weight: number }) => {
+      const result = await addSetServerFn({ data });
+      if (!result.success) throw new Error(result.error);
+      return result;
     },
+    onSuccess: () => setReps(""),
+    onSettled: refreshWorkout,
   });
 
   const deleteSetMutation = useMutation({
-    mutationFn: (setId: string) => deleteSetServerFn({ data: { setId } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
+    mutationFn: async (setId: string) => {
+      const result = await deleteSetServerFn({ data: { setId } });
+      if (!result.success) throw new Error(result.error);
+      return result;
     },
+    onSettled: refreshWorkout,
   });
 
   const handleAddSet = (e: React.FormEvent) => {
@@ -90,7 +136,7 @@ function CurrentWorkoutPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
         <Button variant="outline" onClick={() => completeWorkoutMutation.mutate()}>
           <Check className="w-4 h-4 mr-2" />
@@ -100,18 +146,14 @@ function CurrentWorkoutPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {new Date(workout.startedAt).toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </CardTitle>
+          <CardTitle>{formatDate(workout.startedAt, timeZone, fullDate)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleAddSet} className="flex gap-2 items-center">
-            <Select value={selectedMovement} onChange={(e) => setSelectedMovement(e.target.value)}>
+          <form onSubmit={handleAddSet} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select
+              aria-label="Movement"
+              value={selectedMovement}
+              onChange={(e) => handleMovementChange(e.target.value)}>
               <option value="">Select movement</option>
               {movements.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -121,28 +163,48 @@ function CurrentWorkoutPage() {
             </Select>
             <Input
               type="number"
+              aria-label="Weight"
               placeholder="Weight"
+              inputMode="decimal"
               value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="w-24"
+              onChange={(e) => {
+                setWeight(e.target.value);
+                setWeightIsBodyWeight(false);
+              }}
+              className="sm:w-24"
               min={0}
               max={9999.99}
               step="0.01"
             />
             <Input
               type="number"
+              aria-label="Reps"
               placeholder="Reps"
+              inputMode="numeric"
               value={reps}
               onChange={(e) => setReps(e.target.value)}
-              className="w-24"
+              className="sm:w-24"
               min={1}
               max={1000}
             />
-            <Button type="submit" disabled={!selectedMovement || !reps || !weight} size="sm">
+            <Button
+              type="submit"
+              disabled={!selectedMovement || !reps || !weight}
+              size="sm"
+              className="h-10 w-full sm:h-8 sm:w-auto">
               <Plus className="w-4 h-4 mr-1" />
               {addSetMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </form>
+          {needsBodyWeight && (
+            <p className="text-sm text-slate-500">
+              No body weight recorded yet. Enter a weight, or{" "}
+              <Link to="/body-weight" className="text-primary hover:underline">
+                log your body weight
+              </Link>{" "}
+              to have it filled in.
+            </p>
+          )}
           {workout.sets.length === 0 ? (
             <p className="text-sm text-slate-500">No sets yet. Add exercises to your workout!</p>
           ) : (
@@ -151,15 +213,16 @@ function CurrentWorkoutPage() {
                 <li key={set.id} className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
                   <div>
                     <span className="font-medium">{set.movement.name}</span>
-                    <span className="text-slate-500 ml-2">
-                      {set.reps} reps × {set.weight} lbs
+                    <span className="text-slate-500 ml-2 whitespace-nowrap">
+                      {set.reps} reps × {set.weight} {weightUnit}
                     </span>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={`Remove ${set.movement.name} set`}
                     onClick={() => deleteSetMutation.mutate(set.id)}
-                    className="h-8 w-8 text-slate-400">
+                    className="h-10 w-10 text-slate-400 sm:h-8 sm:w-8">
                     <X className="w-4 h-4" />
                   </Button>
                 </li>

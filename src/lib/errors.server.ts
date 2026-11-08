@@ -1,5 +1,6 @@
 import { isNotFound, isRedirect } from "@tanstack/react-router";
 import { createMiddleware } from "@tanstack/react-start";
+import { fallbackErrorMessage } from "@/lib/error-message";
 
 /**
  * TanStack Start does not rethrow a ZodError when input validation fails. It
@@ -35,5 +36,5 @@ export const errorMiddleware = createMiddleware({ type: "function" }).server(asy
   if (isValidationError(error)) throw new Error("Invalid input");
 
   console.error("Unexpected server function error", error);
-  throw new Error("Something went wrong. Please try again.");
+  throw new Error(fallbackErrorMessage);
 });

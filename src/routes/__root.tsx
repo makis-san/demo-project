@@ -3,6 +3,8 @@ import { useState } from "react";
 import styles from "../styles.css?url";
 import { type QueryClient } from "@tanstack/react-query";
 import { getUserServerFn } from "@/lib/auth.server";
+import { getTimeZoneServerFn } from "@/lib/timezone.server";
+import { TimeZoneSync } from "@/components/time-zone-sync";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
@@ -112,8 +114,8 @@ ${error.stack || "No stack trace available"}`;
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   beforeLoad: async () => {
-    const user = await getUserServerFn();
-    return { user };
+    const [user, timeZone] = await Promise.all([getUserServerFn(), getTimeZoneServerFn()]);
+    return { user, timeZone };
   },
   errorComponent: RootErrorComponent,
   head: () => ({
@@ -155,6 +157,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const config = useClientConfig();
+  const { timeZone } = Route.useRouteContext();
   return (
     <html lang="en">
       <head>
@@ -162,11 +165,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <TimeZoneSync timeZone={timeZone} />
         <ToastContainer position="top-right" autoClose={4000} theme="light" />
         {config.environment === "development" && (
           <TanStackDevtools
             config={{
-              position: "bottom-left",
+              // Not at the bottom: on a phone that corner is the first tab of the navigation bar.
+              position: "middle-left",
             }}
             plugins={[
               {

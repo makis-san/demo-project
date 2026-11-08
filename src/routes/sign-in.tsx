@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signInServerFn } from "@/lib/auth.server";
+import { errorMessage } from "@/lib/error-message";
 
 export const Route = createFileRoute("/sign-in")({
   beforeLoad: ({ context }) => {
@@ -33,8 +34,8 @@ function SignInPage() {
       } else {
         setError(result.error || "Sign in failed");
       }
-    } catch {
-      setError("An unexpected error occurred");
+    } catch (error) {
+      setError(errorMessage(error));
     } finally {
       setIsLoading(false);
     }
