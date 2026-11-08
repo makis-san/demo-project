@@ -110,3 +110,71 @@ test.describe("Phone, signed in", () => {
     expect((await page.context().cookies()).find((c) => c.name === "session")).toBeUndefined();
   });
 });
+
+/** The smallest size, in pixels on the screen, of the text in the chart: its font size times the chart's scale. */
+async function smallestChartTextPx(page: Page) {
+  return page.getByRole("img", { name: /over time$/ }).evaluate((svg: SVGSVGElement) => {
+    const scale = svg.getScreenCTM()!.a;
+    const sizes = [...svg.querySelectorAll("text")].map((text) => parseFloat(getComputedStyle(text).fontSize) * scale);
+    return Math.min(...sizes);
+  });
+}
+
+/** How far the chart's own box scrolls sideways: more than 0 means part of the chart is out of sight. */
+async function chartOverflow(page: Page) {
+  return page.getByRole("img", { name: /over time$/ }).evaluate((svg) => {
+    const box = svg.parentElement!;
+    return box.scrollWidth - box.clientWidth;
+  });
+}
+
+test.describe("Charts on a phone", () => {
+  test.use({ viewport: phone });
+
+  test("should draw the axis labels at a readable size, and scroll the chart instead of the page", async ({
+    page,
+    user,
+  }) => {
+    await seedCompletedWorkouts(
+      user.email,
+      Array.from({ length: 6 }, (_, i) => ({
+        completedAt: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000),
+        sets: [{ movement: "Bench Press", weight: 100 + i, reps: 5 }],
+      })),
+    );
+    await logBodyWeight(page, 180.5);
+    await logBodyWeight(page, 181);
+
+    for (const section of ["Workout History", "Body Weight"] as const) {
+      // Reloaded, so history shows the workouts seeded behind the page's back.
+      await page.goto(section === "Workout History" ? "/workout-history" : "/body-weight");
+      await expect(page.getByRole("img", { name: /over time$/ })).toBeVisible();
+
+      // 11px is the size the labels are drawn at. Scaled down to the card's width they were about 5px.
+      expect(await smallestChartTextPx(page), `${section} chart text`).toBeGreaterThanOrEqual(10.9);
+      await expectNoSidewaysScroll(page);
+      expect(await chartOverflow(page), `${section} chart overflow`).toBeGreaterThan(0);
+    }
+  });
+});
+
+test.describe("Charts on a desktop", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("should fill the card without scrolling, with larger labels than on a phone", async ({ page, user }) => {
+    await seedCompletedWorkouts(
+      user.email,
+      Array.from({ length: 6 }, (_, i) => ({
+        completedAt: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000),
+        sets: [{ movement: "Bench Press", weight: 100 + i, reps: 5 }],
+      })),
+    );
+
+    await page.goto("/workout-history");
+    await expect(page.getByRole("img", { name: /over time$/ })).toBeVisible();
+
+    // The chart is as wide as its card, so there is nothing to scroll, and it is drawn as it always was.
+    expect(await chartOverflow(page)).toBe(0);
+    expect(await smallestChartTextPx(page)).toBeGreaterThan(11);
+  });
+});

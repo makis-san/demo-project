@@ -123,27 +123,10 @@ test.describe("Sets", () => {
   });
 
   // The page shows what was true when it loaded. Another tab, or a request that was edited, can ask for something the
-  // server refuses. The user has to be told, and what they typed has to stay.
+  // server refuses. The user has to be told, the page has to show what the server has now, and what they typed has
+  // to stay: in the form while the workout is open, and for the next workout when it is not.
   test.describe("failures", () => {
     const toast = (page: import("@playwright/test").Page) => page.locator(".Toastify__toast");
-
-    test("should show an error and keep the typed reps when the workout was completed in another tab", async ({
-      page,
-    }) => {
-      const otherTab = await page.context().newPage();
-      await gotoApp(otherTab, "/current-workout");
-      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
-      await expect(otherTab.getByText("No active workout. Ready to start?")).toBeVisible();
-
-      await page.getByLabel("Movement").selectOption({ label: "Bench Press" });
-      await page.getByLabel("Weight").fill("100");
-      await page.getByLabel("Reps").fill("7");
-      await page.getByRole("button", { name: "Add", exact: true }).click();
-
-      await expect(toast(page)).toContainText("No active workout");
-      await expect(page.getByLabel("Reps")).toHaveValue("7");
-      await expect(setRows(page)).toHaveCount(0);
-    });
 
     test("should show an error when the movement belongs to another user", async ({ page, browser }) => {
       const other = newTestUser();
@@ -179,6 +162,45 @@ test.describe("Sets", () => {
       await page.getByRole("button", { name: "Remove Bench Press set" }).click();
 
       await expect(toast(page)).toContainText("Set not found");
+    });
+
+    test("should refresh the sets list after a removal the server refused", async ({ page }) => {
+      await addSet(page, { movement: "Bench Press", weight: 100, reps: 5 });
+      await addSet(page, { movement: "Back Squat", weight: 150, reps: 3 });
+      const otherTab = await page.context().newPage();
+      await gotoApp(otherTab, "/current-workout");
+      await otherTab.getByRole("button", { name: "Remove Bench Press set" }).click();
+      await expect(setRows(otherTab)).toHaveCount(1);
+
+      await page.getByRole("button", { name: "Remove Bench Press set" }).click();
+
+      await expect(toast(page)).toContainText("Set not found");
+      // The page was out of date. The removed set is gone, and the other one is still there.
+      await expect(setRows(page)).toHaveCount(1);
+      await expect(setRows(page).filter({ hasText: "Back Squat" })).toHaveCount(1);
+    });
+
+    test("should show an error, then no workout, and keep the typed reps for the next one when the workout was completed in another tab", async ({
+      page,
+    }) => {
+      const otherTab = await page.context().newPage();
+      await gotoApp(otherTab, "/current-workout");
+      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
+      await expect(otherTab.getByText("No active workout. Ready to start?")).toBeVisible();
+
+      await page.getByLabel("Movement").selectOption({ label: "Bench Press" });
+      await page.getByLabel("Weight").fill("100");
+      await page.getByLabel("Reps").fill("7");
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+
+      await expect(toast(page)).toContainText("No active workout");
+      // The form belongs to a workout, so it goes with it, and nothing was saved.
+      await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
+      await expect(setRows(page)).toHaveCount(0);
+
+      // What was typed is not lost: it is still there for the next workout.
+      await page.getByRole("button", { name: "Start Workout" }).click();
+      await expect(page.getByLabel("Reps")).toHaveValue("7");
     });
   });
 });

@@ -121,6 +121,9 @@ test.describe("Workouts", () => {
       await page.getByRole("button", { name: "Complete Workout" }).click();
 
       await expect(page.locator(".Toastify__toast")).toContainText("No active workout to complete");
+      // The page was out of date. It shows the state the server has, which is no workout.
+      await expect(page.getByText(noActiveWorkout)).toBeVisible();
+      await expect(page.getByRole("button", { name: "Complete Workout" })).toHaveCount(0);
     });
   });
 

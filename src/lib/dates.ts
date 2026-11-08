@@ -11,6 +11,16 @@ export function formatDate(
   return new Date(value).toLocaleDateString("en-US", { ...options, timeZone });
 }
 
+/** The time of day, 24 hours, for example "18:30". */
+export function formatTime(value: Date | string | number, timeZone: string): string {
+  return new Date(value).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  });
+}
+
 export const fullDate: Intl.DateTimeFormatOptions = {
   weekday: "long",
   year: "numeric",

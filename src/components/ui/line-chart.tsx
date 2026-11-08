@@ -19,6 +19,9 @@ type LineChartProps = {
 
 // The chart is drawn in a fixed coordinate system and scaled with the viewBox,
 // so it renders the same on the server and in the browser without measuring.
+// It never gets narrower than that drawing, so its text stays at the size it is drawn at (11px). On a screen
+// narrower than the drawing it scrolls sideways inside its card, because scaled down to a phone's width the
+// text would be about 5px.
 const width = 640;
 const height = 280;
 const margin = { top: 16, right: 24, bottom: 36, left: 56 };
@@ -57,42 +60,49 @@ export function LineChart({
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel} className="w-full h-auto">
-      {yTicks.map((tick) => (
-        <g key={tick}>
-          <line
-            x1={margin.left}
-            x2={width - margin.right}
-            y1={scaleY(tick)}
-            y2={scaleY(tick)}
-            className="stroke-slate-200"
-          />
+    <div className="overflow-x-auto" tabIndex={0}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={ariaLabel}
+        className="w-full h-auto"
+        style={{ minWidth: width }}>
+        {yTicks.map((tick) => (
+          <g key={tick}>
+            <line
+              x1={margin.left}
+              x2={width - margin.right}
+              y1={scaleY(tick)}
+              y2={scaleY(tick)}
+              className="stroke-slate-200"
+            />
+            <text
+              x={margin.left - 8}
+              y={scaleY(tick)}
+              textAnchor="end"
+              dominantBaseline="middle"
+              className="fill-slate-500 text-[11px]">
+              {formatY(tick)}
+            </text>
+          </g>
+        ))}
+        {xLabels.map((tick) => (
           <text
-            x={margin.left - 8}
-            y={scaleY(tick)}
-            textAnchor="end"
-            dominantBaseline="middle"
+            key={tick.x}
+            x={scaleX(tick.x)}
+            y={height - 12}
+            textAnchor="middle"
             className="fill-slate-500 text-[11px]">
-            {formatY(tick)}
+            {tick.label}
           </text>
-        </g>
-      ))}
-      {xLabels.map((tick) => (
-        <text
-          key={tick.x}
-          x={scaleX(tick.x)}
-          y={height - 12}
-          textAnchor="middle"
-          className="fill-slate-500 text-[11px]">
-          {tick.label}
-        </text>
-      ))}
-      {points.length > 1 && <path d={path} fill="none" strokeWidth={2} className="stroke-primary" />}
-      {points.map((p) => (
-        <circle key={`${p.x}-${p.y}`} cx={scaleX(p.x)} cy={scaleY(p.y)} r={4} className="fill-primary">
-          <title>{p.title}</title>
-        </circle>
-      ))}
-    </svg>
+        ))}
+        {points.length > 1 && <path d={path} fill="none" strokeWidth={2} className="stroke-primary" />}
+        {points.map((p, i) => (
+          <circle key={`${p.x}-${p.y}-${i}`} cx={scaleX(p.x)} cy={scaleY(p.y)} r={4} className="fill-primary">
+            <title>{p.title}</title>
+          </circle>
+        ))}
+      </svg>
+    </div>
   );
 }
