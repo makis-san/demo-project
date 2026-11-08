@@ -6,6 +6,7 @@ import { Select } from "@/components/ui/select";
 import { chartDate, formatDate, formatTime, shortDate } from "@/lib/dates";
 import { progressionQueryOptions } from "./-queries/workout-history";
 import { weightUnit } from "@/lib/units";
+import { Stat } from "@/components/stat";
 
 // The README gives max weight "on a given day" and the totals "in a workout", so the chart has a point per day
 // for the first and a point per workout for the other two.
@@ -63,18 +64,38 @@ export function ProgressionChart({
     });
   }
 
+  const latest = points[points.length - 1];
+  const change = points.length > 1 ? latest.y - points[0].y : null;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Progression</CardTitle>
+    <Card className="enter enter-1">
+      <CardHeader className="gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <p className="eyebrow">Trend</p>
+          <CardTitle>Progression</CardTitle>
+        </div>
+        {latest && (
+          <div className="flex items-end gap-6">
+            <Stat label={`Latest ${label.toLowerCase()}`} value={numberFormat.format(latest.y)} unit={unit} />
+            {change !== null && (
+              <p
+                className={`num mb-6 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  change > 0 ? "bg-ok/12 text-ok" : change < 0 ? "bg-danger/12 text-danger" : "bg-well text-muted"
+                }`}>
+                {change > 0 ? "+" : change < 0 ? "−" : "±"}
+                {numberFormat.format(Math.abs(change))} since first
+              </p>
+            )}
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-3">
+      <CardContent className="space-y-5">
+        <div className="grid gap-2 sm:flex sm:flex-wrap">
           <Select
             aria-label="Movement"
             value={movement.id}
             onChange={(e) => setMovementId(e.target.value)}
-            className="w-56">
+            className="sm:w-64">
             {movements.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
@@ -85,7 +106,7 @@ export function ProgressionChart({
             aria-label="Metric"
             value={metric}
             onChange={(e) => setMetric(e.target.value as Metric)}
-            className="w-44">
+            className="sm:w-48">
             {Object.entries(metrics).map(([key, { label }]) => (
               <option key={key} value={key}>
                 {label}
@@ -94,9 +115,11 @@ export function ProgressionChart({
           </Select>
         </div>
         {data === undefined ? (
-          <p className="text-sm text-slate-500">Loading...</p>
+          <p className="py-10 text-center text-sm text-muted">Loading...</p>
         ) : points.length === 0 ? (
-          <p className="text-sm text-slate-500">No completed workouts include this movement yet.</p>
+          <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+            No completed workouts include this movement yet.
+          </p>
         ) : (
           <LineChart
             points={points}

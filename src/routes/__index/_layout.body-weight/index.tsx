@@ -10,6 +10,10 @@ import { addBodyWeightServerFn, deleteBodyWeightServerFn } from "@/lib/body-weig
 import { chartDate, formatDate, shortDate } from "@/lib/dates";
 import { bodyWeightQueryOptions } from "./-queries/body-weight";
 import { weightUnit } from "@/lib/units";
+import { PageHeader } from "@/components/page-header";
+import { Stat } from "@/components/stat";
+
+const numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 export const Route = createFileRoute("/__index/_layout/body-weight/")({
   loader: async ({ context }) => {
@@ -55,16 +59,36 @@ function BodyWeightPage() {
     title: `${entry.weight} ${weightUnit} on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
   }));
 
+  const latest = entries[entries.length - 1];
+  const previous = entries[entries.length - 2];
+  const change = latest && previous ? latest.weight - previous.weight : null;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Body Weight</h1>
+      <PageHeader eyebrow="Track" title="Body Weight" />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Log Body Weight</CardTitle>
+      <Card className="enter enter-1">
+        <CardHeader className="gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1.5">
+            <p className="eyebrow">Today</p>
+            <CardTitle>Log Body Weight</CardTitle>
+          </div>
+          {latest && (
+            <div className="flex items-end gap-5">
+              <Stat label="Latest" value={numberFormat.format(latest.weight)} unit={weightUnit} />
+              {change !== null && (
+                <p className="num mb-6 rounded-full bg-well px-2.5 py-1 text-xs font-semibold text-muted">
+                  {change > 0 ? "+" : change < 0 ? "−" : "±"}
+                  {numberFormat.format(Math.abs(change))} since last
+                </p>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <form
+            onSubmit={handleSubmit}
+            className="grid gap-2 rounded-[1.375rem] border border-line bg-black/20 p-2 sm:w-fit sm:grid-cols-[14rem_auto]">
             <Input
               type="number"
               aria-label={`Weight in ${weightUnit}`}
@@ -72,26 +96,28 @@ function BodyWeightPage() {
               inputMode="decimal"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              className="sm:w-40"
               min={0.01}
               max={9999.99}
               step="0.01"
             />
-            <Button type="submit" disabled={!(parseFloat(weight) > 0)} className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-1" />
+            <Button type="submit" disabled={!(parseFloat(weight) > 0)} className="h-12">
+              <Plus className="h-4 w-4" />
               {addMutation.isPending ? "Saving..." : "Log weight"}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="enter enter-2">
         <CardHeader>
+          <p className="eyebrow">Over time</p>
           <CardTitle>History</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {entries.length === 0 ? (
-            <p className="text-sm text-slate-500">No body weight logged yet. Add your first entry above!</p>
+            <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+              No body weight logged yet. Add your first entry above!
+            </p>
           ) : (
             <>
               <LineChart
@@ -99,24 +125,26 @@ function BodyWeightPage() {
                 formatX={(x) => formatDate(x, timeZone, chartDate)}
                 ariaLabel="Body weight over time"
               />
-              <ul className="space-y-2" aria-label="Body weight entries">
+              <ul className="space-y-1.5" aria-label="Body weight entries">
                 {[...entries].reverse().map((entry) => (
                   <li
                     key={entry.id}
-                    className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
-                    <div>
-                      <span className="font-medium">
+                    className="flex items-center gap-3 rounded-2xl bg-well py-2 pr-2 pl-4 transition-colors hover:bg-white/[0.07]">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4">
+                      <span className="num font-semibold text-chalk">
                         {entry.weight} {weightUnit}
                       </span>
-                      <span className="text-slate-500 ml-2">{formatDate(entry.recordedAt, timeZone, shortDate)}</span>
+                      <span className="num text-sm text-muted">
+                        {formatDate(entry.recordedAt, timeZone, shortDate)}
+                      </span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label="Delete entry"
                       onClick={() => deleteMutation.mutate(entry.id)}
-                      className="h-10 w-10 text-slate-400 sm:h-8 sm:w-8">
-                      <X className="w-4 h-4" />
+                      className="h-10 w-10 text-faint hover:text-danger">
+                      <X className="h-4 w-4" />
                     </Button>
                   </li>
                 ))}
