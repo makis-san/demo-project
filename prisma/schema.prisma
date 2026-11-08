@@ -60,7 +60,8 @@ model Workout {
 model Set {
   id         String   @id @default(uuid())
   workoutId  String
-  workout    Workout  @relation(fields: [workoutId], references: [id])
+  // A set cannot exist without its workout, so the database removes them together.
+  workout    Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   movementId String
   movement   Movement @relation(fields: [movementId], references: [id])
   reps       Int

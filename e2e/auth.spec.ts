@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { test as base, expect, request, type BrowserContext, type Page } from "@playwright/test";
-import { getDb } from "./db";
+import { breakWrites, getDb } from "./db";
 import { gotoApp, newTestUser, signUp, submitSignIn, type TestUser } from "./fixtures";
 
 // These tests use plain pages. The `page` from ./fixtures is already signed in, and here the sign-up and
@@ -221,6 +221,77 @@ test.describe("Sessions", () => {
     }
     await noSession.dispose();
     expect(redirected, "protected calls that redirected").toBeGreaterThan(0);
+  });
+});
+
+test.describe("Unexpected failures", () => {
+  /** Clicks the button and returns what the server function answered, as the browser received it. */
+  async function answerTo(page: Page, button: string) {
+    const answered = page.waitForResponse(
+      (res) => res.request().method() === "POST" && res.url().includes("/_serverFn/"),
+    );
+    await page.getByRole("button", { name: button }).click();
+    return (await answered).text();
+  }
+
+  // A raw database error names the query and the internal host, so it must never reach the browser.
+  const rawDatabaseError = /prisma|invocation|injected failure/i;
+
+  test("should answer a failing sign-up with a generic message", async ({ freshPage }) => {
+    const user = newTestUser();
+    const repair = await breakWrites("User", "BEFORE INSERT", `NEW.email = '${user.email}'`);
+    try {
+      const page = await freshPage();
+      await gotoApp(page, "/create-account");
+      await page.getByLabel("Name").fill(user.name);
+      await page.getByLabel("Email").fill(user.email);
+      await page.getByLabel("Password").fill(user.password);
+
+      const body = await answerTo(page, "Create account");
+
+      expect(body).not.toMatch(rawDatabaseError);
+      expect(body).toContain("Something went wrong. Please try again.");
+      await expect(page.getByText("An unexpected error occurred")).toBeVisible();
+      await expect(page).toHaveURL(/\/create-account/);
+    } finally {
+      await repair();
+    }
+    expect(await getDb().user.count({ where: { email: user.email } })).toBe(0);
+  });
+
+  test("should answer a failing sign-in with a generic message", async ({ freshPage }) => {
+    const user = await createUser(freshPage);
+    const { id } = await getDb().user.findUniqueOrThrow({ where: { email: user.email } });
+    // The password is right, so the failure comes after the check, when the session is stored.
+    const repair = await breakWrites("Session", "BEFORE INSERT", `NEW."userId" = '${id}'`);
+    try {
+      const page = await freshPage();
+      await gotoApp(page, "/sign-in");
+      await page.getByLabel("Email").fill(user.email);
+      await page.getByLabel("Password").fill(user.password);
+
+      const body = await answerTo(page, "Sign in");
+
+      expect(body).not.toMatch(rawDatabaseError);
+      expect(body).toContain("Something went wrong. Please try again.");
+      await expect(page.getByText("An unexpected error occurred")).toBeVisible();
+      await expect(page).toHaveURL(/\/sign-in/);
+    } finally {
+      await repair();
+    }
+  });
+
+  test("should still show the answers the sign-in page is meant to show", async ({ freshPage }) => {
+    // The middleware must only replace unexpected errors. Returned answers pass through untouched.
+    const user = await createUser(freshPage);
+    const page = await freshPage();
+    await gotoApp(page, "/sign-in");
+    await page.getByLabel("Email").fill(user.email);
+    await page.getByLabel("Password").fill("Wrong-password");
+    const body = await answerTo(page, "Sign in");
+
+    expect(body).toContain("Invalid email or password");
+    await expect(page.getByText("Invalid email or password")).toBeVisible();
   });
 });
 

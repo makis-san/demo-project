@@ -65,8 +65,14 @@ function CurrentWorkoutPage() {
     },
   });
 
+  // A server function answers { success: false, error } for failures it expects. Throwing here makes the
+  // mutation fail, so the toast in router.tsx shows the message, and onSuccess does not run.
   const completeWorkoutMutation = useMutation({
-    mutationFn: () => completeWorkoutServerFn(),
+    mutationFn: async () => {
+      const result = await completeWorkoutServerFn();
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       // A completed workout now belongs in the history page and its charts.
@@ -76,7 +82,11 @@ function CurrentWorkoutPage() {
   });
 
   const addSetMutation = useMutation({
-    mutationFn: (data: { movementId: string; reps: number; weight: number }) => addSetServerFn({ data }),
+    mutationFn: async (data: { movementId: string; reps: number; weight: number }) => {
+      const result = await addSetServerFn({ data });
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       setReps("");
@@ -84,7 +94,11 @@ function CurrentWorkoutPage() {
   });
 
   const deleteSetMutation = useMutation({
-    mutationFn: (setId: string) => deleteSetServerFn({ data: { setId } }),
+    mutationFn: async (setId: string) => {
+      const result = await deleteSetServerFn({ data: { setId } });
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
     },

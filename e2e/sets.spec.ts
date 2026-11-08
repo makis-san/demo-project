@@ -1,4 +1,5 @@
-import { test, expect } from "./fixtures";
+import { test, expect, gotoApp, newTestUser, signUp } from "./fixtures";
+import { getDb } from "./db";
 import { addMovement, addSet, setRows, setTexts, startWorkout } from "./helpers";
 
 // Every test starts with a signed-in user who has two movements and an active workout.
@@ -118,6 +119,66 @@ test.describe("Sets", () => {
       // The deletion was saved: a reload does not bring them back.
       await page.reload();
       await expect(page.getByText("No sets yet. Add exercises to your workout!")).toBeVisible();
+    });
+  });
+
+  // The page shows what was true when it loaded. Another tab, or a request that was edited, can ask for something the
+  // server refuses. The user has to be told, and what they typed has to stay.
+  test.describe("failures", () => {
+    const toast = (page: import("@playwright/test").Page) => page.locator(".Toastify__toast");
+
+    test("should show an error and keep the typed reps when the workout was completed in another tab", async ({
+      page,
+    }) => {
+      const otherTab = await page.context().newPage();
+      await gotoApp(otherTab, "/current-workout");
+      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
+      await expect(otherTab.getByText("No active workout. Ready to start?")).toBeVisible();
+
+      await page.getByLabel("Movement").selectOption({ label: "Bench Press" });
+      await page.getByLabel("Weight").fill("100");
+      await page.getByLabel("Reps").fill("7");
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+
+      await expect(toast(page)).toContainText("No active workout");
+      await expect(page.getByLabel("Reps")).toHaveValue("7");
+      await expect(setRows(page)).toHaveCount(0);
+    });
+
+    test("should show an error when the movement belongs to another user", async ({ page, browser }) => {
+      const other = newTestUser();
+      const otherContext = await browser.newContext();
+      const otherPage = await otherContext.newPage();
+      await signUp(otherPage, other);
+      await addMovement(otherPage, "Other Users Movement");
+      await otherContext.close();
+      const foreign = await getDb().movement.findFirstOrThrow({ where: { user: { email: other.email } } });
+
+      // The form only lists the user's own movements, so put the other one in the list the way an edited request would.
+      await page.getByLabel("Movement").evaluate((select, id) => {
+        select.append(new Option("Foreign", id));
+      }, foreign.id);
+      await page.getByLabel("Movement").selectOption({ label: "Foreign" });
+      await page.getByLabel("Weight").fill("100");
+      await page.getByLabel("Reps").fill("5");
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+
+      await expect(toast(page)).toContainText("Movement not found");
+      await expect(page.getByLabel("Reps")).toHaveValue("5");
+      await page.reload();
+      await expect(setRows(page)).toHaveCount(0);
+    });
+
+    test("should show an error when the set was already removed in another tab", async ({ page }) => {
+      await addSet(page, { movement: "Bench Press", weight: 100, reps: 5 });
+      const otherTab = await page.context().newPage();
+      await gotoApp(otherTab, "/current-workout");
+      await otherTab.getByRole("button", { name: "Remove Bench Press set" }).click();
+      await expect(setRows(otherTab)).toHaveCount(0);
+
+      await page.getByRole("button", { name: "Remove Bench Press set" }).click();
+
+      await expect(toast(page)).toContainText("Set not found");
     });
   });
 });
