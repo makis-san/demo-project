@@ -16,5 +16,5 @@ RUN bun install --frozen-lockfile --ignore-scripts && \
     bun run generate && \
     chown -R ${USER_ID}:${GROUP_ID} /app
 
-# Apply any pending migrations, then start the dev server
-CMD ["sh", "-c", "bunx prisma migrate deploy && bunx vite dev --host 0.0.0.0 --port 3000"]
+# Apply any pending migrations, write the built-in movements (safe to repeat), then start the dev server
+CMD ["sh", "-c", "bunx prisma migrate deploy && bun scripts/seed-movements.ts && bunx vite dev --host 0.0.0.0 --port 3000"]

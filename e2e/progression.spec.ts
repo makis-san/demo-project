@@ -1,6 +1,6 @@
 import { test, expect, gotoApp, waitForHydration } from "./fixtures";
 import { getDb } from "./db";
-import { addMovement, completeWorkout, goTo } from "./helpers";
+import { completeWorkout, goTo } from "./helpers";
 
 async function chartTitles(page: import("@playwright/test").Page) {
   return page
@@ -14,8 +14,6 @@ test.describe("Progression chart", () => {
   test.use({ timezoneId: "America/Recife" });
 
   test("should plot max weight per day and the totals per workout, for the chosen movement", async ({ page }) => {
-    await addMovement(page, "Bench Press");
-    await addMovement(page, "Back Squat");
     await completeWorkout(page, [
       { movement: "Bench Press", weight: 100, reps: 5 },
       { movement: "Bench Press", weight: 100, reps: 5 },
@@ -52,8 +50,6 @@ test.describe("Progression chart", () => {
   });
 
   test("should not show the previous movement's points while the next movement loads", async ({ page }) => {
-    await addMovement(page, "Back Squat");
-    await addMovement(page, "Bench Press");
     await completeWorkout(page, [
       { movement: "Back Squat", weight: 200, reps: 5 },
       { movement: "Bench Press", weight: 100, reps: 5 },
@@ -82,7 +78,6 @@ test.describe("Progression chart", () => {
   });
 
   test("should include a workout completed after the chart was first shown", async ({ page }) => {
-    await addMovement(page, "Bench Press");
     await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
     await goTo(page, "Workout History");
     await expect(page.getByRole("img", { name: "Max weight for Bench Press over time" })).toBeVisible();
@@ -96,7 +91,6 @@ test.describe("Progression chart", () => {
   });
 
   test("should plot one point per day, and put a late workout on the user's own day", async ({ page, user }) => {
-    await addMovement(page, "Bench Press");
     await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
     await completeWorkout(page, [{ movement: "Bench Press", weight: 110, reps: 5 }]);
 
@@ -128,7 +122,6 @@ test.describe("Progression chart", () => {
     page,
     user,
   }) => {
-    await addMovement(page, "Bench Press");
     // Three workouts: one alone on Nov 1, and two on Nov 7 in Recife. The two are on different days in UTC, because
     // 01:30 UTC on Nov 8 is 22:30 on Nov 7 in Recife (UTC-3), so the day has to come from the user's timezone.
     const times = ["2026-11-01T15:00:00Z", "2026-11-07T12:00:00Z", "2026-11-08T01:30:00Z"];
@@ -192,7 +185,6 @@ test.describe("Progression chart in another timezone", () => {
   test.use({ timezoneId: "Pacific/Kiritimati" });
 
   test("should use the browser's timezone for the day", async ({ page, user }) => {
-    await addMovement(page, "Bench Press");
     await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
     const workout = await getDb().workout.findFirstOrThrow({ where: { user: { email: user.email } } });
     // 20:00 UTC on Nov 7 is already Nov 8 at UTC+14.

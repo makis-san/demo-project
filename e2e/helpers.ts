@@ -4,16 +4,37 @@ type Section = "Current Workout" | "Workout History" | "Movements" | "Body Weigh
 
 /** Opens a page from the sidebar, the way a user would. */
 export async function goTo(page: Page, section: Section) {
-  await page.getByRole("link", { name: section }).click();
+  await page.getByRole("link", { name: section, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: section })).toBeVisible();
 }
 
+/**
+ * Creates a custom movement through the form. The library already has about a hundred built-ins (Bench Press, Back
+ * Squat, Pull-Up...), and a custom movement cannot take one of their names, so use a name that is not in it.
+ */
 export async function addMovement(page: Page, name: string, options: { bodyWeight?: boolean } = {}) {
   await goTo(page, "Movements");
   await page.getByLabel("Movement name").fill(name);
   if (options.bodyWeight) await page.getByRole("checkbox", { name: /Body-weight movement/ }).check();
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: name })).toBeVisible();
+  await expect(movementRow(page, name)).toBeVisible();
+}
+
+/** The row of a movement in the library, found by its exact name. */
+export function movementRow(page: Page, name: string) {
+  return page.getByRole("listitem").filter({ has: page.getByRole("link", { name, exact: true }) });
+}
+
+/** Picks a movement in the set form's menu the way a user would: open it, type part of the name, tap the option. */
+export async function selectMovement(page: Page, name: string) {
+  const menu = page.getByRole("combobox", { name: "Movement" });
+  await menu.click();
+  await page.getByRole("searchbox", { name: "Search movements" }).fill(name);
+  await page
+    .getByRole("option")
+    .filter({ has: page.getByText(name, { exact: true }) })
+    .click();
+  await expect(menu).toContainText(name);
 }
 
 export async function logBodyWeight(page: Page, weight: number) {
@@ -42,7 +63,7 @@ export function setRows(page: Page) {
 export async function addSet(page: Page, set: { movement: string; weight: number; reps: number }) {
   const rows = setRows(page);
   const before = await rows.count();
-  await page.getByLabel("Movement").selectOption({ label: set.movement });
+  await selectMovement(page, set.movement);
   await page.getByLabel("Weight").fill(String(set.weight));
   await page.getByLabel("Reps").fill(String(set.reps));
   await page.getByRole("button", { name: "Add", exact: true }).click();

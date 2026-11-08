@@ -76,6 +76,9 @@ jobs:
         run: bunx playwright install --with-deps chromium
       - name: Apply migrations
         run: bunx prisma migrate deploy
+      # The built-in movements are rows written from the catalog in code, so the tests need them.
+      - name: Seed the built-in movements
+        run: bun scripts/seed-movements.ts
       # The same command the Docker image runs. Playwright's config expects the app on port 3000.
       - name: Start the app
         run: |

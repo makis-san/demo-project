@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { formatDate, formatTime, fullDate } from "@/lib/dates";
+import { formatDate, formatTime, fullDate, shortDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -11,7 +11,8 @@ import {
 } from "@/lib/workouts.server";
 import { Play, Check } from "lucide-react";
 import { useSuspenseQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/current-workout";
+import { currentWorkoutQueryOptions } from "./-queries/current-workout";
+import type { MovementOption } from "@/components/movement-picker";
 import {
   progressionQueryKey,
   progressionQueryOptions,
@@ -23,6 +24,7 @@ import { RestTimerPill, useRestTimer } from "@/components/rest-timer";
 import { buzz } from "@/lib/use-now";
 import {
   personalRecords,
+  PlannedSets,
   RecapCard,
   SessionCard,
   SetComposer,
@@ -37,7 +39,6 @@ export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(currentWorkoutQueryOptions()),
-      context.queryClient.ensureQueryData(movementsQueryOptions()),
       context.queryClient.ensureQueryData(latestBodyWeightQueryOptions()),
     ]);
   },
@@ -48,9 +49,10 @@ function CurrentWorkoutPage() {
   const { timeZone } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const { data: workout } = useSuspenseQuery(currentWorkoutQueryOptions());
-  const { data: movements } = useSuspenseQuery(movementsQueryOptions());
   const { data: latestBodyWeight } = useSuspenseQuery(latestBodyWeightQueryOptions());
-  const [selectedMovement, setSelectedMovement] = useState("");
+  // The movement picked for the next set. The picker loads movements a page at a time, so the page keeps only this one.
+  const [selected, setSelected] = useState<MovementOption | null>(null);
+  const selectedMovement = selected?.id ?? "";
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
   // True while the weight field holds the body weight we filled in, not something the user typed.
@@ -84,13 +86,11 @@ function CurrentWorkoutPage() {
   });
   const prs = personalRecords(sets, history);
 
-  const selected = movements.find((m) => m.id === selectedMovement);
   const needsBodyWeight = !!selected?.isBodyWeight && latestBodyWeight === null;
 
-  const handleMovementChange = (movementId: string) => {
-    setSelectedMovement(movementId);
-    const movement = movements.find((m) => m.id === movementId);
-    if (movement?.isBodyWeight && latestBodyWeight !== null) {
+  const handleMovementChange = (movement: MovementOption) => {
+    setSelected(movement);
+    if (movement.isBodyWeight && latestBodyWeight !== null) {
       // Keep a weight the user typed, for example the added weight on dips.
       if (weight === "" || weightIsBodyWeight) {
         setWeight(String(latestBodyWeight));
@@ -167,8 +167,8 @@ function CurrentWorkoutPage() {
   });
 
   // A chip from this session picks the movement and its last set, so the next set starts from there.
-  const pickRecent = (set: LoggedSet) => {
-    setSelectedMovement(set.movement.id);
+  const pickRecent = (set: Pick<LoggedSet, "movement" | "weight" | "reps">) => {
+    setSelected(set.movement);
     setWeight(String(set.weight));
     setWeightIsBodyWeight(false);
     setReps(String(set.reps));
@@ -261,8 +261,7 @@ function CurrentWorkoutPage() {
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:items-start">
         <div className="lg:sticky lg:top-6">
           <SetComposer
-            movements={movements}
-            selectedMovement={selectedMovement}
+            selectedMovement={selected}
             onMovementChange={handleMovementChange}
             weight={weight}
             onWeightChange={(value) => {
@@ -294,27 +293,50 @@ function CurrentWorkoutPage() {
           />
         </div>
 
-        {sets.length === 0 ? (
-          <p className="glass rounded-panel px-6 py-12 text-center text-sm text-muted">
-            No sets yet. Add exercises to your workout!
-          </p>
-        ) : (
-          <SetList
-            sets={sets}
-            prs={prs}
-            newestId={sets[sets.length - 1]?.id}
-            onRemove={(set) => deleteSetMutation.mutate(set.id)}
-            onRepeat={(set) =>
-              addSetMutation.mutate({
-                movementId: set.movement.id,
-                reps: set.reps,
-                weight: set.weight,
-                fromForm: false,
-              })
-            }
-            repeatPending={addSetMutation.isPending}
-          />
-        )}
+        <div className="space-y-6">
+          {workout.plan && workout.plan.sets.length > 0 && (
+            <PlannedSets
+              plan={workout.plan.sets}
+              sourceDate={
+                workout.plan.completedAt
+                  ? formatDate(workout.plan.completedAt, timeZone, shortDate)
+                  : "an earlier workout"
+              }
+              logged={sets}
+              pending={addSetMutation.isPending}
+              onAdjust={pickRecent}
+              onLog={(planned) =>
+                addSetMutation.mutate({
+                  movementId: planned.movement.id,
+                  reps: planned.reps,
+                  weight: planned.weight,
+                  fromForm: false,
+                })
+              }
+            />
+          )}
+          {sets.length === 0 ? (
+            <p className="glass rounded-panel px-6 py-12 text-center text-sm text-muted">
+              No sets yet. Add exercises to your workout!
+            </p>
+          ) : (
+            <SetList
+              sets={sets}
+              prs={prs}
+              newestId={sets[sets.length - 1]?.id}
+              onRemove={(set) => deleteSetMutation.mutate(set.id)}
+              onRepeat={(set) =>
+                addSetMutation.mutate({
+                  movementId: set.movement.id,
+                  reps: set.reps,
+                  weight: set.weight,
+                  fromForm: false,
+                })
+              }
+              repeatPending={addSetMutation.isPending}
+            />
+          )}
+        </div>
       </div>
 
       <RestTimerPill timer={timer} />

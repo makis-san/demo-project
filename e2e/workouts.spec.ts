@@ -1,6 +1,6 @@
 import { test, expect, gotoApp } from "./fixtures";
 import { breakWrites, getDb } from "./db";
-import { addMovement, addSet, completeWorkout, goTo, setRows, startWorkout } from "./helpers";
+import { addSet, completeWorkout, goTo, setRows, startWorkout } from "./helpers";
 
 const noActiveWorkout = "No active workout. Ready to start?";
 
@@ -47,7 +47,6 @@ test.describe("Workouts", () => {
 
   test.describe("read", () => {
     test("should display the current active workout", async ({ page }) => {
-      await addMovement(page, "Bench Press");
       await startWorkout(page);
       await addSet(page, { movement: "Bench Press", weight: 100, reps: 5 });
 
@@ -69,7 +68,6 @@ test.describe("Workouts", () => {
     });
 
     test("should display completed workouts in workout history", async ({ page }) => {
-      await addMovement(page, "Bench Press");
       await completeWorkout(page, [
         { movement: "Bench Press", weight: 100, reps: 5 },
         { movement: "Bench Press", weight: 105, reps: 3 },
@@ -98,7 +96,6 @@ test.describe("Workouts", () => {
     });
 
     test("should move completed workout to history", async ({ page }) => {
-      await addMovement(page, "Bench Press");
       await goTo(page, "Workout History");
       await expect(page.getByText("No completed workouts yet.")).toBeVisible();
 
@@ -130,7 +127,6 @@ test.describe("Workouts", () => {
   test.describe("delete", () => {
     /** Completes workouts with 1, 2, ... sets, so each row in history can be told apart by its set count. */
     async function completeWorkoutsWithSetCounts(page: import("@playwright/test").Page, counts: number[]) {
-      await addMovement(page, "Bench Press");
       for (const count of counts) {
         await completeWorkout(
           page,

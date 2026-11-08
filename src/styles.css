@@ -235,6 +235,184 @@
   }
 }
 
+/*
+ * The movement figure and the body maps. The side view is plain SVG, so these classes style the parts that are
+ * drawn: muscles, the range ghost, the bar path and the gear. Colour of a muscle is set from script as it works.
+ */
+@layer components {
+  .figure-stage {
+    --fg-hot: #e0262a;
+    --fg-steel: oklch(72% 0.01 250);
+    --fg-steel-dim: oklch(30% 0.008 250);
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 3.3;
+    max-width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: 1.375rem;
+    background: radial-gradient(120% 90% at 50% 25%, oklch(19% 0.01 20), oklch(13% 0.008 20));
+  }
+  .figure-stage > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .figure-phase {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem 0.375rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line-strong);
+    background: oklch(16% 0.008 20 / 0.82);
+    backdrop-filter: blur(6px);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .figure-phase i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--color-faint);
+    transition:
+      background 250ms,
+      box-shadow 250ms;
+  }
+  .figure-phase[data-phase="conc"] i {
+    background: var(--fg-hot);
+    box-shadow: 0 0 10px var(--fg-hot);
+  }
+  .figure-phase[data-phase="ecc"] i {
+    background: var(--color-accent);
+  }
+  .figure-rep {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.875rem;
+    padding-top: 0.4375rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .figure-angles {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.625rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .figure-angles span {
+    padding: 0.25rem 0.5625rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line);
+    background: oklch(16% 0.008 20 / 0.8);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+  .figure-angles b {
+    font-weight: 700;
+    color: var(--color-chalk);
+  }
+
+  .fg-mp {
+    stroke: oklch(13% 0.008 20);
+    stroke-width: 0.45;
+    stroke-linejoin: round;
+  }
+  .fg-fib {
+    fill: none;
+    stroke: oklch(10% 0.008 20 / 0.55);
+    stroke-width: 0.32;
+    stroke-linecap: round;
+  }
+  .fg-ghost {
+    fill: none;
+    stroke: oklch(100% 0 0 / 0.09);
+    stroke-width: 0.6;
+  }
+  .fg-trail {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 1.1;
+    stroke-dasharray: 2.2 2.2;
+    opacity: 0.75;
+  }
+  .fg-trail-end {
+    fill: var(--color-accent);
+    opacity: 0.8;
+  }
+  .fg-eq {
+    fill: var(--fg-steel);
+  }
+  .fg-eq-dim {
+    fill: var(--fg-steel-dim);
+  }
+  .fg-pad {
+    fill: oklch(24% 0.012 20);
+  }
+  .fg-plate {
+    fill: oklch(30% 0.01 250 / 0.35);
+    stroke: var(--fg-steel);
+    stroke-width: 1.3;
+  }
+  .fg-floor {
+    stroke: var(--color-line-strong);
+    stroke-width: 1.2;
+  }
+
+  /* Front and back maps: every muscle group is tinted by --i, 0 (resting) to 1 (hot). */
+  .body-map {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem;
+    padding: 0.625rem 0.375rem 0.125rem;
+    border: 1px solid var(--color-line);
+    border-radius: 1.125rem;
+    background: oklch(13% 0.008 20);
+  }
+  .body-map figure {
+    margin: 0;
+    text-align: center;
+  }
+  .body-map svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 230px;
+  }
+  .body-map figcaption {
+    padding-bottom: 0.375rem;
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .body-map .sil {
+    fill: oklch(24% 0.008 20);
+  }
+  .body-map .m {
+    --i: 0;
+    fill: color-mix(in oklch, oklch(36% 0.012 20), #e0262a calc(var(--i) * 100%));
+    stroke: oklch(13% 0.008 20);
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+    transition: fill 300ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .body-map .m,
+  .figure-phase i {
+    transition: none;
+  }
+}
+
 /* Motion: a page arrives once; buttons step and press; nothing moves on scroll. */
 @layer utilities {
   .enter {

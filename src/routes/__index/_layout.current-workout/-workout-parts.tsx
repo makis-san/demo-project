@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Plus, Repeat2, Trophy, X } from "lucide-react";
+import { Check, Plus, Repeat2, SlidersHorizontal, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Morph } from "@/components/morph";
 import { Stat } from "@/components/stat";
 import { StepButton, stepValue } from "@/components/stepper";
 import { RestLengthButton, type RestTimerState } from "@/components/rest-timer";
+import { SetValues } from "@/components/set-values";
+import { MovementPicker, type MovementOption } from "@/components/movement-picker";
 import { formatClock, useNow } from "@/lib/use-now";
 import { weightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
@@ -17,7 +19,7 @@ export type LoggedSet = {
   reps: number;
   weight: number;
   createdAt: Date | string;
-  movement: { id: string; name: string };
+  movement: { id: string; name: string; isBodyWeight: boolean };
 };
 
 /** What the history says about a movement, from its completed workouts. */
@@ -93,9 +95,8 @@ export function SessionCard({
 /* ------------------------------------------------------------------------------------------------------------ */
 
 type ComposerProps = {
-  movements: { id: string; name: string }[];
-  selectedMovement: string;
-  onMovementChange: (movementId: string) => void;
+  selectedMovement: MovementOption | null;
+  onMovementChange: (movement: MovementOption) => void;
   weight: string;
   onWeightChange: (value: string) => void;
   reps: string;
@@ -104,7 +105,7 @@ type ComposerProps = {
   isPending: boolean;
   needsBodyWeight: React.ReactNode;
   /** This session's movements, newest first, with the last set of each. */
-  recent: { movement: { id: string; name: string }; last: LoggedSet }[];
+  recent: { movement: LoggedSet["movement"]; last: LoggedSet }[];
   onPickRecent: (set: LoggedSet) => void;
   history: MovementHistory | undefined;
   /** Where − and + start from on an empty field: the last weight and reps for this movement. */
@@ -119,8 +120,8 @@ type ComposerProps = {
  * and reps with − and + (hold to run), then Add. Movements already in the session are one tap away above it.
  */
 export function SetComposer(props: ComposerProps) {
-  const selected = props.movements.find((m) => m.id === props.selectedMovement);
-  const canAdd = !!props.selectedMovement && !!props.reps && !!props.weight;
+  const selected = props.selectedMovement;
+  const canAdd = !!selected && !!props.reps && !!props.weight;
 
   let hint = "Pick what you're lifting";
   if (selected && props.history === undefined) hint = " ";
@@ -129,14 +130,14 @@ export function SetComposer(props: ComposerProps) {
     hint = `Last top set ${numberFormat.format(props.history.lastTop)} ${weightUnit} · ${formatDay(props.history.lastDay)} · Best ${numberFormat.format(props.history.best)}`;
 
   return (
-    <Card className="enter enter-2 p-3 sm:p-4">
+    <Card className="enter enter-2 z-10 p-3 sm:p-4">
       <form onSubmit={props.onSubmit} className="space-y-3">
         {props.recent.length > 0 && (
           <div className="-mx-3 overflow-x-auto px-3 pt-1 sm:-mx-4 sm:px-4">
             <p className="eyebrow mb-2 px-1">This session</p>
             <div className="flex gap-2 pb-1">
               {props.recent.map(({ movement, last }) => {
-                const active = movement.id === props.selectedMovement;
+                const active = movement.id === selected?.id;
                 return (
                   <button
                     key={movement.id}
@@ -159,31 +160,7 @@ export function SetComposer(props: ComposerProps) {
           </div>
         )}
 
-        {/* The native select sits invisibly over the card, so a tap opens the phone's own picker. */}
-        <div className="relative rounded-[1.25rem] border border-line bg-black/25 px-4 py-3.5 transition-colors hover:border-line-strong has-[select:focus-visible]:border-primary has-[select:focus-visible]:shadow-[0_0_0_3px_oklch(58%_0.215_27/0.3)]">
-          <p className="eyebrow">Movement</p>
-          <p
-            className={cn(
-              "mt-1 truncate pr-8 text-xl font-semibold tracking-tight font-stretch-[108%]",
-              selected ? "text-chalk" : "text-faint",
-            )}>
-            {selected?.name ?? "Choose a movement"}
-          </p>
-          <p className="num mt-0.5 min-h-4 truncate pr-8 text-xs text-muted">{hint}</p>
-          <ChevronDown className="pointer-events-none absolute top-1/2 right-4 h-5 w-5 -translate-y-1/2 text-muted" />
-          <select
-            aria-label="Movement"
-            value={props.selectedMovement}
-            onChange={(e) => props.onMovementChange(e.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
-            <option value="">Select movement</option>
-            {props.movements.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MovementPicker value={selected} onChange={props.onMovementChange} hint={hint} />
 
         <NumberDial
           label={`Weight · ${weightUnit}`}
@@ -355,17 +332,14 @@ export function SetList({
                   <li
                     key={set.id}
                     className={cn(
-                      "flex items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-3",
+                      "flex flex-wrap items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-3",
                       set.id === newestId && "enter shadow-[inset_3px_0_0_var(--color-primary)]",
                     )}>
                     <span className="num w-11 shrink-0 text-xs font-semibold text-faint" aria-hidden="true">
                       SET {i + 1}
                     </span>
                     <span className="sr-only">{set.movement.name}</span>
-                    <span className="num min-w-0 flex-1 text-sm whitespace-nowrap text-muted">
-                      <span className="text-lg font-bold text-chalk">{set.reps}</span> reps ×{" "}
-                      <span className="text-lg font-bold text-chalk">{set.weight}</span> {weightUnit}
-                    </span>
+                    <SetValues set={set} />
                     {isPr && (
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold text-accent">
                         <Trophy className="h-3 w-3" aria-hidden="true" /> PR
@@ -396,6 +370,129 @@ export function SetList({
 }
 
 /* ------------------------------------------------------------------------------------------------------------ */
+
+/** A set from the workout this one was repeated from: a plan, not a logged set. */
+export type PlannedSet = { id: string; reps: number; weight: number; movement: LoggedSet["movement"] };
+
+/**
+ * Which planned sets are already done. Nothing is stored for it: the nth planned set of a movement is done once the
+ * workout has n sets of that movement, however the user logged them (with the old numbers or changed ones). So a
+ * reload keeps the ticks, and removing a logged set un-ticks the last one.
+ */
+export function plannedProgress(plan: PlannedSet[], logged: LoggedSet[]) {
+  const loggedCount = new Map<string, number>();
+  for (const set of logged) loggedCount.set(set.movement.id, (loggedCount.get(set.movement.id) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  const done = new Set<string>();
+  for (const planned of plan) {
+    const n = (seen.get(planned.movement.id) ?? 0) + 1;
+    seen.set(planned.movement.id, n);
+    if (n <= (loggedCount.get(planned.movement.id) ?? 0)) done.add(planned.id);
+  }
+  return done;
+}
+
+/**
+ * The checklist of a repeated workout. Tapping a planned set logs it with the old weight and reps. "Adjust" loads
+ * it into the form instead, so either can be changed before adding. Planned sets are not real until they are logged,
+ * so skipping one leaves nothing in history, charts or PRs.
+ */
+export function PlannedSets({
+  plan,
+  sourceDate,
+  logged,
+  onLog,
+  onAdjust,
+  pending,
+}: {
+  plan: PlannedSet[];
+  sourceDate: string;
+  logged: LoggedSet[];
+  onLog: (set: PlannedSet) => void;
+  onAdjust: (set: PlannedSet) => void;
+  pending: boolean;
+}) {
+  const done = plannedProgress(plan, logged);
+  const groups: { movement: PlannedSet["movement"]; sets: PlannedSet[] }[] = [];
+  for (const set of plan) {
+    const group = groups.find((g) => g.movement.id === set.movement.id);
+    if (group) group.sets.push(set);
+    else groups.push({ movement: set.movement, sets: [set] });
+  }
+
+  return (
+    <Card className="enter p-2 sm:p-3" aria-label="Planned sets">
+      <div className="flex items-center justify-between gap-3 px-3 pt-2 pb-3">
+        <div className="min-w-0">
+          <p className="eyebrow">Planned from {sourceDate}</p>
+          <p className="num text-base font-semibold tracking-tight text-chalk font-stretch-[108%]">
+            {done.size} of {plan.length} logged
+          </p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {groups.map(({ movement, sets }) => (
+          <div key={movement.id}>
+            <p className="truncate px-3 pb-1.5 text-sm font-semibold text-muted">{movement.name}</p>
+            <ul className="space-y-1" aria-label={`Planned ${movement.name} sets`}>
+              {sets.map((set) => {
+                const isDone = done.has(set.id);
+                return (
+                  <li
+                    key={set.id}
+                    data-done={isDone}
+                    className={cn(
+                      "flex items-center gap-2 rounded-2xl bg-well py-1.5 pr-1.5 pl-3",
+                      isDone && "opacity-50",
+                    )}>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "grid h-6 w-6 shrink-0 place-items-center rounded-full border",
+                        isDone ? "border-ok bg-ok/20 text-ok" : "border-line-strong text-transparent",
+                      )}>
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="num min-w-0 flex-1 text-sm whitespace-nowrap text-muted">
+                      <span className="text-lg font-bold text-chalk">{set.reps}</span> reps ×{" "}
+                      <span className="text-lg font-bold text-chalk">{set.weight}</span> {weightUnit}
+                    </span>
+                    {isDone ? (
+                      <span className="pr-3 text-xs font-semibold text-ok">Logged</span>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Adjust planned ${movement.name} set: ${set.reps} × ${set.weight} ${weightUnit}`}
+                          onClick={() => onAdjust(set)}
+                          className="h-10 px-3 text-muted">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Adjust
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={pending}
+                          aria-label={`Log planned ${movement.name} set: ${set.reps} × ${set.weight} ${weightUnit}`}
+                          onClick={() => onLog(set)}
+                          className="h-10 px-4">
+                          Log
+                        </Button>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 export type Recap = { seconds: number; sets: number; volume: number; prs: number };
 

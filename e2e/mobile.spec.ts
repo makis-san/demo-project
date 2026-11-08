@@ -32,7 +32,6 @@ test.describe("Phone, signed in", () => {
   test.use({ viewport: phone });
 
   test("should log a set with every control inside the window", async ({ page }) => {
-    await addMovement(page, "Bench Press");
     await startWorkout(page);
 
     // Each control has the whole width, and the Add button is on the screen and not too small to tap.
@@ -62,7 +61,12 @@ test.describe("Phone, signed in", () => {
 
   test("should fit every signed-in page in the window", async ({ page, user }) => {
     // Long names and many columns are what pushed the pages wide.
-    const names = ["Barbell Back Squat With Pause", "Romanian Deadlift", "Overhead Press Standing", "Weighted Pull-up"];
+    const names = [
+      "Barbell Back Squat With Pause",
+      "Romanian Deadlift Slow Tempo",
+      "Overhead Press Standing",
+      "Weighted Pull-up",
+    ];
     for (const name of names) await addMovement(page, name);
     await seedCompletedWorkouts(
       user.email,
