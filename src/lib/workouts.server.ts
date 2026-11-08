@@ -1,44 +1,67 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getServerSidePrismaClient } from "@/lib/db.server";
+import { getServerSidePrismaClient, isUniqueViolation } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
+import { errorMiddleware } from "@/lib/errors.server";
+import { repsSchema, weightSchema } from "@/lib/validation";
+import { withNumberWeight } from "@/lib/sets.server";
 import { z } from "zod";
 
+// createdAt alone can tie for sets added in the same millisecond, so id breaks the tie.
+const setOrder = [{ createdAt: "asc" as const }, { id: "asc" as const }];
+
+type DbClient = Awaited<ReturnType<typeof getServerSidePrismaClient>>;
+
+/**
+ * The user's one active workout, or null. A unique index allows at most one
+ * per user, so no ordering is needed to pick between several.
+ */
+function findActiveWorkout(prisma: DbClient, userId: string) {
+  return prisma.workout.findFirst({
+    where: { userId, completedAt: null },
+    include: {
+      sets: {
+        include: { movement: true },
+        orderBy: setOrder,
+      },
+    },
+  });
+}
+
+type ActiveWorkout = NonNullable<Awaited<ReturnType<typeof findActiveWorkout>>>;
+
+function toClientWorkout(workout: ActiveWorkout) {
+  return { ...workout, sets: workout.sets.map(withNumberWeight) };
+}
+
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    const workout = await prisma.workout.create({
-      data: {
-        userId: context.user.id,
-      },
-    });
-    return { success: true, workout };
+    try {
+      await prisma.workout.create({ data: { userId: context.user.id } });
+    } catch (error) {
+      // The unique index on active workouts rejected a second one, for example
+      // from a double click or a second tab. The existing one is what the user wants.
+      if (!isUniqueViolation(error)) throw error;
+    }
+    const workout = await findActiveWorkout(prisma, context.user.id);
+    if (!workout) throw new Error("Active workout not found after creating it");
+    return { success: true, workout: toClientWorkout(workout) };
   });
 
 export const getCurrentWorkoutServerFn = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    // Get the most recent workout for the user
-    const workout = await prisma.workout.findFirst({
-      where: { userId: context.user.id, completedAt: null },
-      orderBy: { id: "desc" },
-      include: {
-        sets: {
-          include: { movement: true },
-        },
-      },
-    });
-    return workout;
+    const workout = await findActiveWorkout(prisma, context.user.id);
+    return workout && toClientWorkout(workout);
   });
 
 export const completeWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
-    const workout = await prisma.workout.findFirst({
-      where: { userId: context.user.id, completedAt: null },
-    });
+    const workout = await findActiveWorkout(prisma, context.user.id);
     if (!workout) {
       return { success: false, error: "No active workout to complete" };
     }
@@ -50,8 +73,8 @@ export const completeWorkoutServerFn = createServerFn({ method: "POST" })
   });
 
 export const addSetServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ movementId: z.string(), reps: z.number().min(1), weight: z.number().min(0) }))
+  .middleware([errorMiddleware, authMiddleware])
+  .inputValidator(z.object({ movementId: z.string(), reps: repsSchema, weight: weightSchema }))
   .handler(
     async ({
       context,
@@ -61,11 +84,16 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       data: { movementId: string; reps: number; weight: number };
     }) => {
       const prisma = await getServerSidePrismaClient();
-      const workout = await prisma.workout.findFirst({
-        where: { userId: context.user.id, completedAt: null },
-      });
+      const workout = await findActiveWorkout(prisma, context.user.id);
       if (!workout) {
         return { success: false, error: "No active workout" };
+      }
+      const movement = await prisma.movement.findFirst({
+        where: { id: data.movementId, userId: context.user.id },
+        select: { id: true },
+      });
+      if (!movement) {
+        return { success: false, error: "Movement not found" };
       }
       const set = await prisma.set.create({
         data: {
@@ -76,12 +104,12 @@ export const addSetServerFn = createServerFn({ method: "POST" })
         },
         include: { movement: true },
       });
-      return { success: true, set };
+      return { success: true, set: withNumberWeight(set) };
     },
   );
 
 export const deleteSetServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .inputValidator(z.object({ setId: z.string() }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { setId: string } }) => {
     const prisma = await getServerSidePrismaClient();
@@ -97,7 +125,7 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
   });
 
 export const getWorkoutHistoryServerFn = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
     const workouts = await prisma.workout.findMany({
@@ -106,14 +134,15 @@ export const getWorkoutHistoryServerFn = createServerFn()
       include: {
         sets: {
           include: { movement: true },
+          orderBy: setOrder,
         },
       },
     });
-    return workouts;
+    return workouts.map((workout) => ({ ...workout, sets: workout.sets.map(withNumberWeight) }));
   });
 
 export const deleteWorkoutsServerFn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([errorMiddleware, authMiddleware])
   .inputValidator(z.object({ workoutIds: z.array(z.string()) }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { workoutIds: string[] } }) => {
     const prisma = await getServerSidePrismaClient();

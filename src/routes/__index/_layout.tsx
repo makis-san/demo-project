@@ -20,7 +20,7 @@ function RouteComponent() {
   const { user } = Route.useRouteContext();
   return (
     <div className="min-h-screen flex bg-slate-50">
-      <nav className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col">
+      <nav className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col sticky top-0 h-screen shrink-0">
         <img src="/wordmark.svg" alt="Logo" className="h-6 mb-8" />
         <div className="flex flex-col gap-1 flex-1">
           {navItems.map(({ to, label, icon: Icon }) => (

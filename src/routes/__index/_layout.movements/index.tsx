@@ -20,7 +20,12 @@ function MovementsPage() {
   const [name, setName] = useState("");
 
   const createMovementMutation = useMutation({
-    mutationFn: (name: string) => createMovementServerFn({ data: { name } }),
+    mutationFn: async (name: string) => {
+      const result = await createMovementServerFn({ data: { name } });
+      // The router shows a toast for any error thrown from a mutation.
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: movementsQueryOptions().queryKey });
       setName("");
