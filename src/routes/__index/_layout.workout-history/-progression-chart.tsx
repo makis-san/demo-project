@@ -68,7 +68,7 @@ export function ProgressionChart({
   const change = points.length > 1 ? latest.y - points[0].y : null;
 
   return (
-    <Card className="enter enter-1">
+    <Card className="enter enter-2">
       <CardHeader className="gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <p className="eyebrow">Trend</p>
@@ -76,7 +76,7 @@ export function ProgressionChart({
         </div>
         {latest && (
           <div className="flex items-end gap-6">
-            <Stat label={`Latest ${label.toLowerCase()}`} value={numberFormat.format(latest.y)} unit={unit} />
+            <Stat label={`Latest ${label.toLowerCase()}`} value={numberFormat.format(latest.y)} unit={unit} morph />
             {change !== null && (
               <p
                 className={`num mb-6 rounded-full px-2.5 py-1 text-xs font-semibold ${

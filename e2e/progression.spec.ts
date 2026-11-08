@@ -1,4 +1,4 @@
-import { test, expect, waitForHydration } from "./fixtures";
+import { test, expect, gotoApp, waitForHydration } from "./fixtures";
 import { getDb } from "./db";
 import { addMovement, completeWorkout, goTo } from "./helpers";
 
@@ -58,7 +58,10 @@ test.describe("Progression chart", () => {
       { movement: "Back Squat", weight: 200, reps: 5 },
       { movement: "Bench Press", weight: 100, reps: 5 },
     ]);
-    await goTo(page, "Workout History");
+    // A full load, not the sidebar: the current workout page already fetched each of its movements' history for
+    // the last-set and PR hints, so after a client navigation the bench press data would be cached and there would
+    // be no loading state to look at.
+    await gotoApp(page, "/workout-history");
     // Movements are listed by name, so the squat chart is the first one shown.
     await expect(page.getByRole("img", { name: "Max weight for Back Squat over time" })).toBeVisible();
     expect(await chartTitles(page)).toEqual([expect.stringMatching(/^200 lbs on /)]);

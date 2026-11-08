@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
+import { Plus, X, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { StepButton, stepValue } from "@/components/stepper";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { LineChart } from "@/components/ui/line-chart";
 import { addBodyWeightServerFn, deleteBodyWeightServerFn } from "@/lib/body-weight.server";
@@ -27,6 +29,7 @@ function BodyWeightPage() {
   const queryClient = useQueryClient();
   const { data: entries } = useSuspenseQuery(bodyWeightQueryOptions());
   const [weight, setWeight] = useState("");
+  const [range, setRange] = useState<Range>("all");
 
   const addMutation = useMutation({
     mutationFn: (value: number) => addBodyWeightServerFn({ data: { weight: value } }),
@@ -53,106 +56,187 @@ function BodyWeightPage() {
     addMutation.mutate(value);
   };
 
-  const points = entries.map((entry) => ({
+  const latest = entries[entries.length - 1];
+  // Ranges count back from the latest entry, not from the clock, so the server and the browser draw the same thing.
+  const latestTime = latest ? new Date(latest.recordedAt).getTime() : 0;
+  const inRange = entries.filter(
+    (entry) => range === "all" || new Date(entry.recordedAt).getTime() >= latestTime - rangeDays[range] * dayMs,
+  );
+  const points = inRange.map((entry) => ({
     x: new Date(entry.recordedAt).getTime(),
     y: entry.weight,
     title: `${entry.weight} ${weightUnit} on ${formatDate(entry.recordedAt, timeZone, shortDate)}`,
   }));
-
-  const latest = entries[entries.length - 1];
-  const previous = entries[entries.length - 2];
-  const change = latest && previous ? latest.weight - previous.weight : null;
+  const rangeChange = inRange.length > 1 ? inRange[inRange.length - 1].weight - inRange[0].weight : null;
+  const weights = inRange.map((entry) => entry.weight);
+  const loggedToday =
+    latest && formatDate(latest.recordedAt, timeZone, shortDate) === formatDate(Date.now(), timeZone, shortDate);
 
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Track" title="Body Weight" />
 
-      <Card className="enter enter-1">
-        <CardHeader className="gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1.5">
-            <p className="eyebrow">Today</p>
-            <CardTitle>Log Body Weight</CardTitle>
-          </div>
-          {latest && (
-            <div className="flex items-end gap-5">
-              <Stat label="Latest" value={numberFormat.format(latest.weight)} unit={weightUnit} />
-              {change !== null && (
-                <p className="num mb-6 rounded-full bg-well px-2.5 py-1 text-xs font-semibold text-muted">
-                  {change > 0 ? "+" : change < 0 ? "−" : "±"}
-                  {numberFormat.format(Math.abs(change))} since last
-                </p>
-              )}
+      <Card className="enter enter-1 p-3 sm:p-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex items-end justify-between gap-3 px-2 pt-2">
+            <div className="space-y-1">
+              <p className="eyebrow">Weigh in</p>
+              <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Log Body Weight</h2>
             </div>
+            {latest && (
+              <button
+                type="button"
+                onClick={() => setWeight(String(latest.weight))}
+                className="press num h-10 shrink-0 rounded-full border border-line bg-white/[0.04] px-3.5 text-xs font-semibold text-muted hover:border-line-strong hover:text-chalk">
+                Same as last · <span className="text-chalk">{numberFormat.format(latest.weight)}</span>
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-[1.375rem] border border-line bg-black/25 p-2">
+            <div className="flex items-center gap-2">
+              <StepButton
+                direction="down"
+                onStep={() => setWeight(stepValue(weight, -0.1, { start: latest?.weight }))}
+                className="h-14 w-14">
+                0.1 less
+              </StepButton>
+              <div className="relative min-w-0 flex-1">
+                <Input
+                  type="number"
+                  aria-label={`Weight in ${weightUnit}`}
+                  placeholder={latest ? numberFormat.format(latest.weight) : "0.0"}
+                  inputMode="decimal"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  min={0.01}
+                  max={9999.99}
+                  step="0.01"
+                  className="h-20 rounded-2xl border-transparent bg-transparent pr-9 pl-2 text-center text-[2.5rem] sm:pr-12 sm:pl-12 sm:text-5xl font-bold tracking-tight font-stretch-[85%] [appearance:textfield] placeholder:text-faint/50 hover:border-transparent focus-visible:bg-black/30 [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span
+                  className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-sm text-muted sm:right-4"
+                  aria-hidden="true">
+                  {weightUnit}
+                </span>
+              </div>
+              <StepButton
+                direction="up"
+                onStep={() => setWeight(stepValue(weight, 0.1, { start: latest?.weight }))}
+                className="h-14 w-14">
+                0.1 more
+              </StepButton>
+            </div>
+          </div>
+
+          <Button type="submit" disabled={!(parseFloat(weight) > 0)} className="h-12 w-full text-base">
+            <Plus className="h-5 w-5" />
+            {addMutation.isPending ? "Saving..." : "Log weight"}
+          </Button>
+          {loggedToday && (
+            <p className="num px-2 pb-1 text-center text-xs text-faint">
+              Already logged {numberFormat.format(latest.weight)} {weightUnit} today. Another entry adds a second point.
+            </p>
           )}
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={handleSubmit}
-            className="grid gap-2 rounded-[1.375rem] border border-line bg-black/20 p-2 sm:w-fit sm:grid-cols-[14rem_auto]">
-            <Input
-              type="number"
-              aria-label={`Weight in ${weightUnit}`}
-              placeholder={`Weight (${weightUnit})`}
-              inputMode="decimal"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              min={0.01}
-              max={9999.99}
-              step="0.01"
-            />
-            <Button type="submit" disabled={!(parseFloat(weight) > 0)} className="h-12">
-              <Plus className="h-4 w-4" />
-              {addMutation.isPending ? "Saving..." : "Log weight"}
-            </Button>
-          </form>
-        </CardContent>
+        </form>
       </Card>
 
-      <Card className="enter enter-2">
-        <CardHeader>
-          <p className="eyebrow">Over time</p>
-          <CardTitle>History</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {entries.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
-              No body weight logged yet. Add your first entry above!
-            </p>
-          ) : (
-            <>
+      <Card className="enter enter-2 p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2 pb-4">
+          <div className="space-y-1">
+            <p className="eyebrow">Over time</p>
+            <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">History</h2>
+          </div>
+          {entries.length > 0 && (
+            <div className="flex gap-1 rounded-full bg-black/25 p-1" role="group" aria-label="Range">
+              {(Object.keys(rangeLabels) as Range[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={range === key}
+                  onClick={() => setRange(key)}
+                  className={cn(
+                    "press h-9 rounded-full px-3.5 text-xs font-semibold",
+                    range === key ? "bg-white/[0.12] text-chalk" : "text-faint hover:text-chalk",
+                  )}>
+                  {rangeLabels[key]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {entries.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-line-strong px-4 py-10 text-center text-sm text-muted">
+            No body weight logged yet. Add your first entry above!
+          </p>
+        ) : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4 px-2 sm:grid-cols-4">
+              <Stat label="Latest" value={numberFormat.format(latest.weight)} unit={weightUnit} morph />
+              <Stat
+                label={range === "all" ? "Change, all time" : `Change, ${rangeLabels[range]}`}
+                value={rangeChange === null ? "–" : signed(rangeChange)}
+                unit={rangeChange === null ? undefined : weightUnit}
+                morph
+              />
+              <Stat label="Lowest" value={numberFormat.format(Math.min(...weights))} unit={weightUnit} morph />
+              <Stat label="Highest" value={numberFormat.format(Math.max(...weights))} unit={weightUnit} morph />
+            </div>
+            {points.length > 0 && (
               <LineChart
                 points={points}
                 formatX={(x) => formatDate(x, timeZone, chartDate)}
                 ariaLabel="Body weight over time"
               />
-              <ul className="space-y-1.5" aria-label="Body weight entries">
-                {[...entries].reverse().map((entry) => (
+            )}
+            <ul className="space-y-1.5" aria-label="Body weight entries">
+              {[...entries].reverse().map((entry, i, newestFirst) => {
+                const before = newestFirst[i + 1];
+                const delta = before ? entry.weight - before.weight : null;
+                return (
                   <li
                     key={entry.id}
-                    className="flex items-center gap-3 rounded-2xl bg-well py-2 pr-2 pl-4 transition-colors hover:bg-white/[0.07]">
-                    <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4">
-                      <span className="num font-semibold text-chalk">
-                        {entry.weight} {weightUnit}
-                      </span>
-                      <span className="num text-sm text-muted">
-                        {formatDate(entry.recordedAt, timeZone, shortDate)}
-                      </span>
-                    </div>
+                    className="flex items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-4 transition-colors hover:bg-white/[0.07]">
+                    <span className="num min-w-0 flex-1 text-lg font-bold text-chalk font-stretch-[90%]">
+                      {entry.weight} {weightUnit}
+                    </span>
+                    {delta !== null && <DeltaChip delta={delta} />}
+                    <span className="num w-24 shrink-0 text-right text-xs text-muted">
+                      {formatDate(entry.recordedAt, timeZone, shortDate)}
+                    </span>
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label="Delete entry"
                       onClick={() => deleteMutation.mutate(entry.id)}
-                      className="h-10 w-10 text-faint hover:text-danger">
+                      className="h-10 w-10 shrink-0 text-faint hover:text-danger">
                       <X className="h-4 w-4" />
                     </Button>
                   </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </CardContent>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </Card>
     </div>
+  );
+}
+
+type Range = "30" | "90" | "all";
+const rangeDays = { "30": 30, "90": 90, all: Infinity } as const;
+const rangeLabels: Record<Range, string> = { "30": "30 days", "90": "90 days", all: "All" };
+const dayMs = 24 * 60 * 60 * 1000;
+
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${numberFormat.format(Math.abs(n))}`;
+
+/** The change from the entry before, as an arrow and the amount. Neutral colours: up or down isn't good or bad. */
+function DeltaChip({ delta }: { delta: number }) {
+  const Icon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
+  return (
+    <span className="num inline-flex shrink-0 items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-muted">
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      {numberFormat.format(Math.abs(delta))}
+    </span>
   );
 }

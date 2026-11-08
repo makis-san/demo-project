@@ -86,3 +86,56 @@ export const getProgressionServerFn = createServerFn()
       return { days, workouts };
     },
   );
+
+export type CalendarDay = {
+  /** The day in the user's timezone, as YYYY-MM-DD. */
+  day: string;
+  workouts: number;
+  sets: number;
+  volume: number;
+};
+
+export type TrainingCalendar = {
+  /** Today in the user's timezone, as YYYY-MM-DD, so the page lays out the weeks without trusting the clock. */
+  today: string;
+  /** Only days with a completed workout, oldest first. */
+  days: CalendarDay[];
+};
+
+/** How many days back the calendar goes: 18 weeks, so a phone shows a full grid and a desktop four months. */
+export const calendarDays = 18 * 7;
+
+/**
+ * Completed workouts per day over the last `calendarDays` days, for the training calendar on the history page.
+ * Days are grouped in the user's timezone, the same way as the progression chart, so a late workout lands on the
+ * user's own day. A workout without sets still counts as a day trained.
+ */
+export const getTrainingCalendarServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }: { context: { user: { id: string } } }): Promise<TrainingCalendar> => {
+    const prisma = await getServerSidePrismaClient();
+    const timeZone = resolveTimeZone();
+    const [[{ today }], days] = await prisma.$transaction([
+      prisma.$queryRaw<{ today: string }[]>`
+        SELECT to_char((now() AT TIME ZONE ${timeZone})::date, 'YYYY-MM-DD') AS "today"
+      `,
+      prisma.$queryRaw<CalendarDay[]>`
+        SELECT
+          to_char(local.day, 'YYYY-MM-DD') AS "day",
+          COUNT(DISTINCT w."id")::int AS "workouts",
+          COUNT(s."id")::int AS "sets",
+          COALESCE(SUM(s."weight" * s."reps"), 0)::float8 AS "volume"
+        FROM "Workout" w
+        CROSS JOIN LATERAL (
+          SELECT (w."completedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone})::date AS day
+        ) local
+        LEFT JOIN "Set" s ON s."workoutId" = w."id"
+        WHERE w."userId" = ${context.user.id}
+          AND w."completedAt" IS NOT NULL
+          AND local.day > (now() AT TIME ZONE ${timeZone})::date - ${calendarDays}::int
+        GROUP BY local.day
+        ORDER BY local.day
+      `,
+    ]);
+    return { today, days };
+  });
