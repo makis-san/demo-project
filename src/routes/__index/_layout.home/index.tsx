@@ -192,7 +192,9 @@ function HomePage() {
         <p className="num text-sm text-muted">
           {week.workouts === 0
             ? "No workouts yet this week"
-            : `${plural(week.workouts, "workout")} · ${plural(week.sets, "set")} · ${volumeFormat.format(week.volume)} ${weightUnit}`}
+            : week.sets === 0
+              ? `${plural(week.workouts, "workout")} · no sets logged`
+              : `${plural(week.workouts, "workout")} · ${plural(week.sets, "set")} · ${volumeFormat.format(week.volume)} ${weightUnit}`}
         </p>
       </section>
 
@@ -204,7 +206,7 @@ function HomePage() {
             <span className="num min-w-0 flex-1 truncate text-sm text-chalk">
               {[
                 formatDate(last.completedAt, timeZone, { month: "short", day: "numeric" }),
-                plural(last.setCount, "set"),
+                last.setCount > 0 ? plural(last.setCount, "set") : "Empty workout",
                 last.presetName ?? brief(last.movements, 2),
               ]
                 .filter(Boolean)
