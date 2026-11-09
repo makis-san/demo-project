@@ -8,10 +8,10 @@ interface AlertProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const variantStyles: Record<AlertVariant, string> = {
-  default: "bg-slate-50 border-slate-200 text-slate-900 [&>svg]:text-slate-600",
-  destructive: "bg-red-50 border-red-200 text-red-900 [&>svg]:text-red-600",
-  warning: "bg-amber-50 border-amber-200 text-amber-900 [&>svg]:text-amber-600",
-  success: "bg-emerald-50 border-emerald-200 text-emerald-900 [&>svg]:text-emerald-600",
+  default: "bg-well border-line text-chalk [&>svg]:text-muted",
+  destructive: "bg-danger/10 border-danger/30 text-chalk [&>svg]:text-danger",
+  warning: "bg-amber-400/10 border-amber-300/30 text-chalk [&>svg]:text-amber-300",
+  success: "bg-ok/10 border-ok/30 text-chalk [&>svg]:text-ok",
 };
 
 const Alert = forwardRef<HTMLDivElement, AlertProps>(({ className, variant = "default", ...props }, ref) => (
@@ -19,7 +19,7 @@ const Alert = forwardRef<HTMLDivElement, AlertProps>(({ className, variant = "de
     ref={ref}
     role="alert"
     className={cn(
-      "relative w-full rounded-lg border p-4 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7",
+      "relative w-full rounded-2xl border p-4 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7",
       variantStyles[variant],
       className,
     )}
@@ -37,7 +37,7 @@ AlertTitle.displayName = "AlertTitle";
 
 const AlertDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("text-sm [&_p]:leading-relaxed", className)} {...props} />
+    <div ref={ref} className={cn("text-sm text-muted [&_p]:leading-relaxed", className)} {...props} />
   ),
 );
 AlertDescription.displayName = "AlertDescription";

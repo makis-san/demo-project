@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { formatDate, fullDate } from "@/lib/dates";
+import { formatDate, formatTime, fullDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,10 @@ import { currentWorkoutQueryOptions, movementsQueryOptions } from "./-queries/cu
 import { progressionQueryKey, workoutHistoryQueryKey } from "../_layout.workout-history/-queries/workout-history";
 import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
 import { weightUnit } from "@/lib/units";
+import { PageHeader } from "@/components/page-header";
+import { Stat } from "@/components/stat";
+
+const volumeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 export const Route = createFileRoute("/__index/_layout/current-workout/")({
   loader: async ({ context }) => {
@@ -120,36 +124,64 @@ function CurrentWorkoutPage() {
   if (!workout) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-slate-500 mb-4">No active workout. Ready to start?</p>
+        <PageHeader eyebrow="Today" title="Current Workout" />
+        <Card className="enter enter-1 overflow-hidden">
+          <div className="relative flex flex-col items-start gap-6 p-7 sm:p-10">
+            <div aria-hidden="true" className="flex w-40 flex-col gap-2.5 opacity-90">
+              <span className="h-3 w-full rounded-full bg-primary" />
+              <span className="h-3 w-[70%] rounded-full bg-primary/60" />
+              <span className="h-3 w-[40%] rounded-full bg-primary/30" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-2xl font-semibold tracking-tight font-stretch-[112%] text-chalk sm:text-3xl">
+                No active workout. Ready to start?
+              </p>
+              <p className="max-w-md text-sm text-muted">
+                Start a session, then log each set as you finish it. Everything you lift lands in your history.
+              </p>
+            </div>
             <Button onClick={() => createWorkoutMutation.mutate()} size="lg">
-              <Play className="w-4 h-4 mr-2" />
+              <Play className="h-4 w-4 fill-current" />
               {createWorkoutMutation.isPending ? "Starting..." : "Start Workout"}
             </Button>
-          </CardContent>
+          </div>
         </Card>
       </div>
     );
   }
 
+  const volume = workout.sets.reduce((sum, set) => sum + set.weight * set.reps, 0);
+  const movementCount = new Set(workout.sets.map((set) => set.movement.id)).size;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">Current Workout</h1>
-        <Button variant="outline" onClick={() => completeWorkoutMutation.mutate()}>
-          <Check className="w-4 h-4 mr-2" />
-          {completeWorkoutMutation.isPending ? "Completing..." : "Complete Workout"}
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow={`In progress · started ${formatTime(workout.startedAt, timeZone)}`}
+        title="Current Workout"
+        actions={
+          <Button variant="outline" onClick={() => completeWorkoutMutation.mutate()}>
+            <Check className="h-4 w-4" />
+            {completeWorkoutMutation.isPending ? "Completing..." : "Complete Workout"}
+          </Button>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{formatDate(workout.startedAt, timeZone, fullDate)}</CardTitle>
+      <Card className="enter enter-1">
+        <CardHeader className="gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1.5">
+            <p className="eyebrow">Session</p>
+            <CardTitle className="text-xl sm:text-2xl">{formatDate(workout.startedAt, timeZone, fullDate)}</CardTitle>
+          </div>
+          <div className="grid grid-cols-3 gap-6 sm:gap-10">
+            <Stat label="Sets" value={workout.sets.length} />
+            <Stat label="Movements" value={movementCount} />
+            <Stat label="Volume" value={volumeFormat.format(volume)} unit={weightUnit} />
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleAddSet} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <CardContent className="space-y-5">
+          <form
+            onSubmit={handleAddSet}
+            className="grid gap-2 rounded-[1.375rem] border border-line bg-black/20 p-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_6.5rem_auto]">
             <Select
               aria-label="Movement"
               value={selectedMovement}
@@ -164,14 +196,13 @@ function CurrentWorkoutPage() {
             <Input
               type="number"
               aria-label="Weight"
-              placeholder="Weight"
+              placeholder={`Weight (${weightUnit})`}
               inputMode="decimal"
               value={weight}
               onChange={(e) => {
                 setWeight(e.target.value);
                 setWeightIsBodyWeight(false);
               }}
-              className="sm:w-24"
               min={0}
               max={9999.99}
               step="0.01"
@@ -183,38 +214,38 @@ function CurrentWorkoutPage() {
               inputMode="numeric"
               value={reps}
               onChange={(e) => setReps(e.target.value)}
-              className="sm:w-24"
               min={1}
               max={1000}
             />
-            <Button
-              type="submit"
-              disabled={!selectedMovement || !reps || !weight}
-              size="sm"
-              className="h-10 w-full sm:h-8 sm:w-auto">
-              <Plus className="w-4 h-4 mr-1" />
+            <Button type="submit" disabled={!selectedMovement || !reps || !weight} className="h-12">
+              <Plus className="h-4 w-4" />
               {addSetMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </form>
           {needsBodyWeight && (
-            <p className="text-sm text-slate-500">
+            <p className="px-2 text-sm text-muted">
               No body weight recorded yet. Enter a weight, or{" "}
-              <Link to="/body-weight" className="text-primary hover:underline">
+              <Link to="/body-weight" className="text-primary underline-offset-4 hover:underline">
                 log your body weight
               </Link>{" "}
               to have it filled in.
             </p>
           )}
           {workout.sets.length === 0 ? (
-            <p className="text-sm text-slate-500">No sets yet. Add exercises to your workout!</p>
+            <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+              No sets yet. Add exercises to your workout!
+            </p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="setlist space-y-1.5">
               {workout.sets.map((set) => (
-                <li key={set.id} className="px-3 py-2 bg-slate-50 rounded-lg text-sm flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{set.movement.name}</span>
-                    <span className="text-slate-500 ml-2 whitespace-nowrap">
-                      {set.reps} reps × {set.weight} {weightUnit}
+                <li
+                  key={set.id}
+                  className="flex items-center gap-3 rounded-2xl bg-well py-2 pr-2 pl-4 transition-colors hover:bg-white/[0.07]">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+                    <span className="truncate font-medium text-chalk">{set.movement.name}</span>
+                    <span className="num whitespace-nowrap text-sm text-muted">
+                      <span className="text-base font-semibold text-chalk">{set.reps}</span> reps ×{" "}
+                      <span className="text-base font-semibold text-chalk">{set.weight}</span> {weightUnit}
                     </span>
                   </div>
                   <Button
@@ -222,8 +253,8 @@ function CurrentWorkoutPage() {
                     size="icon"
                     aria-label={`Remove ${set.movement.name} set`}
                     onClick={() => deleteSetMutation.mutate(set.id)}
-                    className="h-10 w-10 text-slate-400 sm:h-8 sm:w-8">
-                    <X className="w-4 h-4" />
+                    className="h-10 w-10 text-faint hover:text-danger">
+                    <X className="h-4 w-4" />
                   </Button>
                 </li>
               ))}

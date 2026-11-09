@@ -15,6 +15,9 @@ import {
 import { ProgressionChart } from "./-progression-chart";
 import { useSuspenseInfiniteQuery, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { weightUnit } from "@/lib/units";
+import { PageHeader } from "@/components/page-header";
+
+const headClass = "eyebrow whitespace-nowrap px-3 py-3 font-semibold";
 
 export const Route = createFileRoute("/__index/_layout/workout-history/")({
   loader: async ({ context }) => {
@@ -77,9 +80,7 @@ function WorkoutHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Workout History</h1>
-      </div>
+      <PageHeader eyebrow="Review" title="Workout History" />
 
       {movements.length > 0 && (
         <ProgressionChart
@@ -90,36 +91,41 @@ function WorkoutHistoryPage() {
         />
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle>Completed Workouts</CardTitle>
+      <Card className="enter enter-2">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1.5">
+            <p className="eyebrow">Log</p>
+            <CardTitle>Completed Workouts</CardTitle>
+          </div>
           <Button size="sm" variant="destructive" onClick={handleDeleteSelected} disabled={selectedWorkouts.size === 0}>
-            <Trash2 className="w-4 h-4 mr-2" />
+            <Trash2 className="h-4 w-4" />
             {deleteWorkoutsMutation.isPending ? "Deleting..." : `Delete Selected (${selectedWorkouts.size})`}
           </Button>
         </CardHeader>
         <CardContent>
           {workouts.length === 0 ? (
-            <p className="text-sm text-slate-500">No completed workouts yet.</p>
+            <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
+              No completed workouts yet.
+            </p>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="-mx-2 overflow-x-auto rounded-2xl">
+                <table className="num w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="whitespace-nowrap py-3 px-4">
+                    <tr className="border-b border-line">
+                      <th className="whitespace-nowrap px-3 py-3">
                         <input
                           type="checkbox"
                           aria-label="Select all workouts"
                           checked={selectedWorkouts.size === workouts.length}
                           onChange={toggleAll}
-                          className="rounded border-gray-300"
+                          className="h-4 w-4 cursor-pointer"
                         />
                       </th>
-                      <th className="text-left whitespace-nowrap py-3 px-4 font-medium text-slate-600">Date</th>
-                      <th className="text-right whitespace-nowrap py-3 px-4 font-medium text-slate-600">Sets</th>
+                      <th className={headClass + " text-left"}>Date</th>
+                      <th className={headClass + " text-right"}>Sets</th>
                       {movements.map(({ id, name }) => (
-                        <th key={id} className="text-right whitespace-nowrap py-3 px-4 font-medium text-slate-600">
+                        <th key={id} className={headClass + " text-right"}>
                           {name}
                         </th>
                       ))}
@@ -137,27 +143,25 @@ function WorkoutHistoryPage() {
                       return (
                         <tr
                           key={workout.id}
-                          className={`border-b border-slate-100 ${isSelected ? "bg-primary/10" : "hover:bg-slate-50"}`}>
-                          <td className="whitespace-nowrap py-3 px-4">
+                          className={`border-b border-line last:border-0 transition-colors ${isSelected ? "bg-primary/10" : "hover:bg-white/[0.04]"}`}>
+                          <td className="whitespace-nowrap px-3 py-3.5">
                             <input
                               type="checkbox"
                               aria-label="Select workout"
                               checked={selectedWorkouts.has(workout.id)}
                               onChange={() => toggleWorkout(workout.id)}
-                              className="rounded border-gray-300"
+                              className="h-4 w-4 cursor-pointer"
                             />
                           </td>
-                          <td className="whitespace-nowrap py-3 px-4 text-slate-500">
+                          <td className="whitespace-nowrap px-3 py-3.5 font-medium text-chalk">
                             {workout.completedAt ? formatDate(workout.completedAt, timeZone, shortDate) : "-"}
                           </td>
-                          <td className="whitespace-nowrap py-3 px-4 text-right text-slate-600">
-                            {workout.sets.length}
-                          </td>
+                          <td className="whitespace-nowrap px-3 py-3.5 text-right text-muted">{workout.sets.length}</td>
                           {movements.map(({ id: movementId }) => {
                             const movementSets = setsByMovement.get(movementId);
                             if (!movementSets || movementSets.length === 0) {
                               return (
-                                <td key={movementId} className="whitespace-nowrap py-3 px-4 text-right text-slate-300">
+                                <td key={movementId} className="whitespace-nowrap px-3 py-3.5 text-right text-faint/60">
                                   -
                                 </td>
                               );
@@ -168,8 +172,11 @@ function WorkoutHistoryPage() {
                             );
                             const numSets = movementSets.length;
                             return (
-                              <td key={movementId} className="whitespace-nowrap py-3 px-4 text-right text-slate-600">
-                                {maxWeight} {weightUnit} / {avgReps} reps / {numSets} sets
+                              <td key={movementId} className="whitespace-nowrap px-3 py-3.5 text-right text-muted">
+                                <span className="font-semibold text-chalk">
+                                  {maxWeight} {weightUnit}
+                                </span>{" "}
+                                / {avgReps} reps / {numSets} sets
                               </td>
                             );
                           })}
@@ -180,7 +187,7 @@ function WorkoutHistoryPage() {
                 </table>
               </div>
               {hasNextPage && (
-                <div className="mt-4 text-center">
+                <div className="mt-5 text-center">
                   <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                     {isFetchingNextPage ? "Loading..." : "Load more"}
                   </Button>

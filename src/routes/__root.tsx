@@ -5,6 +5,7 @@ import { type QueryClient } from "@tanstack/react-query";
 import { getUserServerFn } from "@/lib/auth.server";
 import { getTimeZoneServerFn } from "@/lib/timezone.server";
 import { TimeZoneSync } from "@/components/time-zone-sync";
+import { Stage } from "@/components/stage";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
@@ -46,13 +47,13 @@ ${error.stack || "No stack trace available"}`;
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-dvh flex items-center justify-center px-4">
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
+          <div className="mx-auto w-16 h-16 rounded-full bg-danger/15 flex items-center justify-center mb-4">
+            <AlertTriangle className="w-8 h-8 text-danger" />
           </div>
-          <CardTitle className="text-xl font-semibold text-gray-900">Something went wrong</CardTitle>
+          <CardTitle className="text-xl">Something went wrong</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert variant="destructive">
@@ -63,19 +64,19 @@ ${error.stack || "No stack trace available"}`;
                 variant="ghost"
                 size="sm"
                 onClick={copyErrorToClipboard}
-                className="h-6 px-2 text-red-700 hover:bg-red-100">
+                className="h-7 w-7 p-0 text-danger hover:bg-danger/15">
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </Button>
             </div>
             <AlertDescription className="mt-2">
               {isDev ? (
                 <div className="space-y-2">
-                  <p className="font-medium">{error.name}</p>
+                  <p className="font-medium text-chalk">{error.name}</p>
                   <p className="text-sm">{error.message}</p>
                   {error.stack && (
                     <details className="mt-2" open>
                       <summary className="cursor-pointer text-sm font-medium">Stack trace</summary>
-                      <pre className="mt-2 text-xs overflow-x-auto bg-red-100 p-2 rounded whitespace-pre-wrap break-words max-w-full">
+                      <pre className="mt-2 text-xs overflow-x-auto bg-black/30 p-3 rounded-xl whitespace-pre-wrap break-words max-w-full">
                         {error.stack}
                       </pre>
                     </details>
@@ -92,18 +93,18 @@ ${error.stack || "No stack trace available"}`;
 
           <div className="flex flex-col gap-2">
             <Button onClick={reset} className="w-full">
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-4 h-4" />
               Try again
             </Button>
             <Button variant="outline" onClick={() => router.navigate({ to: "/" })} className="w-full">
-              <Home className="w-4 h-4 mr-2" />
+              <Home className="w-4 h-4" />
               Go to home
             </Button>
           </div>
 
           {!isDev && (
             <div className="text-center">
-              <p className="text-sm text-gray-500">Error ID: {Date.now().toString(36)}</p>
+              <p className="num text-sm text-faint">Error ID: {Date.now().toString(36)}</p>
             </div>
           )}
         </CardContent>
@@ -128,6 +129,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
+        name: "theme-color",
+        content: "#171412",
+      },
+      {
         title: "Setlist",
       },
     ],
@@ -140,6 +145,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         rel: "manifest",
         href: "/manifest.json",
+      },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap",
       },
       {
         rel: "stylesheet",
@@ -164,9 +175,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <Stage />
         {children}
         <TimeZoneSync timeZone={timeZone} />
-        <ToastContainer position="top-right" autoClose={4000} theme="light" />
+        <ToastContainer position="top-right" autoClose={4000} theme="dark" />
         {config.environment === "development" && (
           <TanStackDevtools
             config={{

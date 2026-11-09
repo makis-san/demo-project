@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { evenlySpaced, niceTicks } from "@/lib/chart-scale";
 
 export type ChartPoint = {
@@ -37,6 +38,8 @@ export function LineChart({
   minTickStep = 0,
   ariaLabel,
 }: LineChartProps) {
+  // useId gives characters like ":" that a url(#...) reference cannot hold.
+  const gradientId = `chart-fill-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
   const xMin = Math.min(...xs);
@@ -59,14 +62,26 @@ export function LineChart({
     .map((p, i) => `${i === 0 ? "M" : "L"}${scaleX(p.x).toFixed(1)},${scaleY(p.y).toFixed(1)}`)
     .join(" ");
 
+  const baseline = margin.top + plotHeight;
+  const area =
+    points.length > 1
+      ? `${path} L${scaleX(points[points.length - 1].x).toFixed(1)},${baseline} L${scaleX(points[0].x).toFixed(1)},${baseline} Z`
+      : "";
+
   return (
-    <div className="overflow-x-auto" tabIndex={0}>
+    <div className="overflow-x-auto rounded-2xl" tabIndex={0}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={ariaLabel}
         className="w-full h-auto"
         style={{ minWidth: width }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.32} />
+            <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
         {yTicks.map((tick) => (
           <g key={tick}>
             <line
@@ -74,14 +89,16 @@ export function LineChart({
               x2={width - margin.right}
               y1={scaleY(tick)}
               y2={scaleY(tick)}
-              className="stroke-slate-200"
+              className="stroke-line"
+              strokeDasharray="2 6"
+              strokeLinecap="round"
             />
             <text
               x={margin.left - 8}
               y={scaleY(tick)}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-slate-500 text-[11px]">
+              className="num fill-faint text-[11px]">
               {formatY(tick)}
             </text>
           </g>
@@ -92,13 +109,30 @@ export function LineChart({
             x={scaleX(tick.x)}
             y={height - 12}
             textAnchor="middle"
-            className="fill-slate-500 text-[11px]">
+            className="num fill-faint text-[11px]">
             {tick.label}
           </text>
         ))}
-        {points.length > 1 && <path d={path} fill="none" strokeWidth={2} className="stroke-primary" />}
+        {area && <path d={area} fill={`url(#${gradientId})`} />}
+        {points.length > 1 && (
+          <path
+            d={path}
+            fill="none"
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            className="stroke-primary"
+          />
+        )}
         {points.map((p, i) => (
-          <circle key={`${p.x}-${p.y}-${i}`} cx={scaleX(p.x)} cy={scaleY(p.y)} r={4} className="fill-primary">
+          <circle
+            key={`${p.x}-${p.y}-${i}`}
+            cx={scaleX(p.x)}
+            cy={scaleY(p.y)}
+            r={4.5}
+            strokeWidth={2}
+            // The latest reading is filled, the rest are rings.
+            className={`${i === points.length - 1 ? "fill-primary" : "fill-ground"} stroke-primary hover:fill-primary`}>
             <title>{p.title}</title>
           </circle>
         ))}

@@ -168,7 +168,7 @@ const DropdownMenuContent = forwardRef<HTMLDivElement, DropdownMenuContentProps>
         role="menu"
         aria-orientation="vertical"
         className={cn(
-          "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-lg",
+          "absolute z-50 min-w-[8rem] overflow-hidden rounded-2xl border border-line bg-raised p-1 shadow-lg",
           "animate-in fade-in-0 zoom-in-95",
           alignStyles[align],
           className,
@@ -205,7 +205,7 @@ const DropdownMenuItem = forwardRef<HTMLButtonElement, DropdownMenuItemProps>(
         disabled={disabled}
         className={cn(
           "relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
-          "transition-colors hover:bg-gray-100 focus:bg-gray-100",
+          "transition-colors hover:bg-white/10 focus:bg-white/10",
           "disabled:pointer-events-none disabled:opacity-50",
           inset && "pl-8",
           className,
@@ -224,7 +224,7 @@ const DropdownMenuLabel = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
   ({ className, inset, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("px-2 py-1.5 text-sm font-semibold text-gray-900", inset && "pl-8", className)}
+      className={cn("px-2 py-1.5 text-sm font-semibold text-chalk", inset && "pl-8", className)}
       {...props}
     />
   ),
@@ -233,9 +233,7 @@ DropdownMenuLabel.displayName = "DropdownMenuLabel";
 
 // Separator component
 const DropdownMenuSeparator = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("-mx-1 my-1 h-px bg-gray-200", className)} {...props} />
-  ),
+  ({ className, ...props }, ref) => <div ref={ref} className={cn("-mx-1 my-1 h-px bg-line", className)} {...props} />,
 );
 DropdownMenuSeparator.displayName = "DropdownMenuSeparator";
 
