@@ -5,6 +5,7 @@ import {
   createWorkout,
   goTo,
   logBodyWeight,
+  nextStep,
   pickMovements,
   setRows,
   startWorkout,
@@ -15,11 +16,23 @@ const toast = (page: import("@playwright/test").Page) => page.locator(".Toastify
 const exercise = (page: import("@playwright/test").Page, name: string) => page.locator(`[data-exercise="${name}"]`);
 const sets = (page: import("@playwright/test").Page, name: string) =>
   page.getByRole("list", { name: `Sets of ${name}` }).getByRole("listitem");
+const setCount = (page: import("@playwright/test").Page, name: string) =>
+  page.getByRole("spinbutton", { name: `Sets of ${name}`, exact: true });
+const rest = (page: import("@playwright/test").Page, name: string) =>
+  page.getByRole("button", { name: `Rest after each set of ${name}`, exact: true });
+/** Picks a rest from a movement's rest menu, by its label: "1:30", "2 min". */
+async function pickRest(page: import("@playwright/test").Page, name: string, label: string) {
+  await rest(page, name).click();
+  await page.getByRole("menuitemradio", { name: label, exact: true }).click();
+}
+/** Opens the series of a movement one by one, for a pyramid or a drop set. */
+const editEachSet = (page: import("@playwright/test").Page, name: string) =>
+  exercise(page, name).getByRole("button", { name: "Edit each set" }).click();
 
 async function newWorkoutForm(page: import("@playwright/test").Page) {
   await goTo(page, "Workout Library");
   await page.getByRole("link", { name: "Create your first workout" }).click();
-  await expect(page.getByRole("button", { name: "Save workout" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next: Sets & rest" })).toBeVisible();
 }
 
 test.describe("Workout library", () => {
@@ -35,14 +48,14 @@ test.describe("Workout library", () => {
       page,
     }) => {
       await newWorkoutForm(page);
-      await page.getByLabel("Workout name").fill("Upper");
       await pickMovements(page, ["Bench Press", "Barbell Row"]);
+      await nextStep(page);
 
       for (const name of ["Bench Press", "Barbell Row"]) {
-        await expect(sets(page, name)).toHaveCount(3);
-        await expect(page.getByLabel(`Rest after each set of ${name}, in seconds`)).toHaveValue("60");
-        await expect(page.getByLabel(`Reps of set 1 of ${name}`)).toHaveValue("10");
-        await expect(page.getByLabel(`Weight of set 1 of ${name}, optional`)).toHaveValue("");
+        await expect(setCount(page, name)).toHaveValue("3");
+        await expect(rest(page, name)).toHaveText("1 min");
+        await expect(page.getByLabel(`Reps of every set of ${name}`)).toHaveValue("10");
+        await expect(page.getByLabel(`Weight of every set of ${name}, optional`)).toHaveValue("");
       }
       await expect(page.getByText("2 movements · 6 sets")).toBeVisible();
     });
@@ -50,7 +63,17 @@ test.describe("Workout library", () => {
     test("should edit the series of a movement in place, without adding the movement again", async ({ page }) => {
       await newWorkoutForm(page);
       await pickMovements(page, ["Bench Press"]);
+      await nextStep(page);
 
+      // One row sets every series at once: three sets of ten become four of eight.
+      await exercise(page, "Bench Press").getByRole("button", { name: "More" }).first().click();
+      await expect(setCount(page, "Bench Press")).toHaveValue("4");
+      await page.getByLabel("Reps of every set of Bench Press").fill("8");
+      await page.getByRole("spinbutton", { name: "Sets of Bench Press", exact: true }).fill("3");
+      await expect(setCount(page, "Bench Press")).toHaveValue("3");
+
+      await editEachSet(page, "Bench Press");
+      await expect(page.getByLabel("Reps of set 3 of Bench Press")).toHaveValue("8");
       await page.getByLabel("Reps of set 1 of Bench Press").fill("8");
       await page.getByLabel("Weight of set 1 of Bench Press, optional").fill("100");
       // A new set starts as a copy of the last one.
@@ -74,23 +97,29 @@ test.describe("Workout library", () => {
       await newWorkoutForm(page);
       await pickMovements(page, ["Bench Press", "Barbell Row", "Back Squat"]);
 
-      await exercise(page, "Bench Press").getByRole("button", { name: "90s" }).click();
-      await expect(page.getByLabel("Rest after each set of Bench Press, in seconds")).toHaveValue("90");
-      await page.getByLabel("Rest after each set of Barbell Row, in seconds").fill("75");
-
+      // The order and the removals are the first step.
       await page.getByRole("button", { name: "Move Back Squat up" }).click();
       await expect(page.locator("[data-exercise]")).toHaveText([/Bench Press/, /Back Squat/, /Barbell Row/]);
       await page.getByRole("button", { name: "Remove Back Squat" }).click();
       await expect(page.locator("[data-exercise]")).toHaveCount(2);
+
+      await nextStep(page);
+      await pickRest(page, "Bench Press", "1:30");
+      await expect(rest(page, "Bench Press")).toHaveText("1:30");
+      await pickRest(page, "Barbell Row", "1:15");
+      await expect(rest(page, "Barbell Row")).toHaveText("1:15");
     });
 
     test("should save it to the library, with the weight left empty where none was given", async ({ page, user }) => {
       await newWorkoutForm(page);
-      await page.getByLabel("Workout name").fill("Push day");
       await pickMovements(page, ["Bench Press", "Overhead Press"]);
+      await nextStep(page);
+      await editEachSet(page, "Bench Press");
       await page.getByLabel("Weight of set 1 of Bench Press, optional").fill("100");
       await page.getByLabel("Reps of set 1 of Bench Press").fill("5");
-      await exercise(page, "Overhead Press").getByRole("button", { name: "120s" }).click();
+      await pickRest(page, "Overhead Press", "2 min");
+      await nextStep(page);
+      await page.getByLabel("Workout name").fill("Push day");
       await page.getByRole("button", { name: "Save workout" }).click();
 
       await expect(
@@ -125,7 +154,7 @@ test.describe("Workout library", () => {
       await expect(page.locator("[data-exercise]")).toHaveText([/Barbell Row/, /Lat Pulldown/]);
 
       await page.getByLabel("Workout name").fill("Pull day B");
-      await page.getByLabel("Reps of set 1 of Lat Pulldown").fill("12");
+      await page.getByLabel("Reps of every set of Lat Pulldown").fill("12");
       await page.getByRole("button", { name: "Remove Barbell Row" }).click();
       await page.getByRole("button", { name: "Save workout" }).click();
 
@@ -133,40 +162,120 @@ test.describe("Workout library", () => {
       await expect(page.getByText("Pull day", { exact: true })).toHaveCount(0);
       await page.getByRole("link", { name: "Edit Pull day B" }).click();
       await expect(page.locator("[data-exercise]")).toHaveText([/Lat Pulldown/]);
-      await expect(page.getByLabel("Reps of set 1 of Lat Pulldown")).toHaveValue("12");
+      await expect(page.getByLabel("Reps of every set of Lat Pulldown")).toHaveValue("12");
     });
 
-    test("should say what is missing, and not save until it is fixed", async ({ page }) => {
+    test("should say what is missing at each step, and not go on or save until it is fixed", async ({ page }) => {
       await newWorkoutForm(page);
-      const save = page.getByRole("button", { name: "Save workout" });
+      const next = page.getByRole("button", { name: /^Next: / });
 
+      await expect(next).toBeDisabled();
+      await expect(page.getByText("Add at least one movement")).toBeVisible();
+      await pickMovements(page, ["Back Squat"]);
+      await expect(next).toBeEnabled();
+      await nextStep(page);
+
+      await page.getByLabel("Reps of every set of Back Squat").fill("0");
+      await expect(next).toBeDisabled();
+      await expect(page.getByText("Back Squat, set 1: reps must be a whole number from 1 to 1000")).toBeVisible();
+      await page.getByLabel("Reps of every set of Back Squat").fill("5");
+      await page.getByLabel("Weight of every set of Back Squat, optional").fill("100.123");
+      await expect(next).toBeDisabled();
+      await expect(page.getByText("Use at most 2 decimal places", { exact: false })).toBeVisible();
+      // A later step cannot be opened from the step list either.
+      await expect(
+        page.getByRole("navigation", { name: "Steps" }).getByRole("button", { name: /Name & save/ }),
+      ).toBeDisabled();
+      await page.getByLabel("Weight of every set of Back Squat, optional").fill("");
+      await expect(next).toBeEnabled();
+      await nextStep(page);
+
+      const save = page.getByRole("button", { name: "Save workout" });
       await expect(save).toBeDisabled();
       await expect(page.getByText("Give the workout a name")).toBeVisible();
       await page.getByLabel("Workout name").fill("Legs");
-      await expect(page.getByText("Add at least one movement")).toBeVisible();
+      await expect(save).toBeEnabled();
+    });
 
-      await pickMovements(page, ["Back Squat"]);
-      await expect(save).toBeEnabled();
-      await page.getByLabel("Reps of set 1 of Back Squat").fill("0");
-      await expect(save).toBeDisabled();
-      await expect(page.getByText("Back Squat, set 1: reps must be a whole number from 1 to 1000")).toBeVisible();
-      await page.getByLabel("Reps of set 1 of Back Squat").fill("5");
-      await page.getByLabel("Weight of set 1 of Back Squat, optional").fill("100.123");
-      await expect(save).toBeDisabled();
-      await expect(page.getByText("Use at most 2 decimal places", { exact: false })).toBeVisible();
-      await page.getByLabel("Weight of set 1 of Back Squat, optional").fill("");
-      await page.getByLabel("Rest after each set of Back Squat, in seconds").fill("4000");
-      await expect(save).toBeDisabled();
-      await page.getByLabel("Rest after each set of Back Squat, in seconds").fill("0");
-      await expect(save).toBeEnabled();
+    test("should give several movements a scheme or a rest at once, and undo it", async ({ page }) => {
+      await newWorkoutForm(page);
+      await pickMovements(page, ["Bench Press", "Barbell Row", "Back Squat"]);
+      await nextStep(page);
+      const bulk = page.getByRole("toolbar", { name: "Edit several movements at once" });
+
+      // Nothing ticked: there is nothing to change yet, only the way to tick.
+      await expect(bulk.getByRole("button", { name: "4 × 8" })).toHaveCount(0);
+      await bulk.getByRole("checkbox", { name: "Select all movements" }).click();
+      await expect(bulk.getByText("3 selected")).toBeVisible();
+      await bulk.getByRole("button", { name: "4 × 8" }).click();
+      await bulk.getByRole("button", { name: "Rest for the selected movements" }).click();
+      await page.getByRole("menuitemradio", { name: "1:30", exact: true }).click();
+      for (const name of ["Bench Press", "Barbell Row", "Back Squat"]) {
+        await expect(setCount(page, name)).toHaveValue("4");
+        await expect(page.getByLabel(`Reps of every set of ${name}`)).toHaveValue("8");
+        await expect(rest(page, name)).toHaveText("1:30");
+      }
+
+      // Ticked ones only.
+      await bulk.getByRole("checkbox", { name: "Clear the selection" }).click();
+      await page.getByRole("checkbox", { name: "Select Back Squat" }).click();
+      await expect(bulk.getByText("1 selected")).toBeVisible();
+      await bulk.getByRole("button", { name: "5 × 5" }).click();
+      await expect(setCount(page, "Back Squat")).toHaveValue("5");
+      await expect(setCount(page, "Bench Press")).toHaveValue("4");
+
+      await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+      await expect(setCount(page, "Back Squat")).toHaveValue("4");
+    });
+
+    test("should remove and reorder ticked movements together", async ({ page }) => {
+      await newWorkoutForm(page);
+      await pickMovements(page, ["Bench Press", "Barbell Row", "Back Squat", "Deadlift"]);
+
+      await page.getByRole("checkbox", { name: "Select Deadlift" }).click();
+      await page.getByRole("checkbox", { name: "Select Back Squat" }).click();
+      await page.getByRole("button", { name: "To top" }).click();
+      await expect(page.locator("[data-exercise]")).toHaveText([
+        /Back Squat/,
+        /Deadlift/,
+        /Bench Press/,
+        /Barbell Row/,
+      ]);
+      await page.getByRole("button", { name: "Remove 2" }).click();
+      await expect(page.locator("[data-exercise]")).toHaveText([/Bench Press/, /Barbell Row/]);
+      await page.getByRole("status").getByRole("button", { name: "Undo" }).click();
+      await expect(page.locator("[data-exercise]")).toHaveCount(4);
+    });
+
+    test("should show what a movement is from the chooser, and tick it from there", async ({ page }) => {
+      await newWorkoutForm(page);
+      await page.getByRole("button", { name: "Add movements" }).click();
+      const dialog = page.getByRole("dialog", { name: "Add movements" });
+      await dialog.getByRole("searchbox", { name: "Search movements" }).fill("Front Squat");
+      await dialog.getByRole("button", { name: "Details of Front Squat" }).click();
+
+      await expect(dialog.getByTestId("movement-detail")).toBeVisible();
+      await expect(dialog.getByRole("img", { name: "Side view of Front Squat" })).toBeVisible();
+      await expect(dialog.getByRole("list", { name: "Primary muscles" })).toContainText("Quads");
+      await dialog.getByRole("button", { name: "Select", exact: true }).click();
+      // Escape goes back to the list, where it was, with the tick kept.
+      await page.keyboard.press("Escape");
+      await expect(dialog.getByRole("checkbox", { name: "Select Front Squat" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await dialog.getByRole("button", { name: "Add 1 movement" }).click();
+      await expect(page.locator("[data-exercise]")).toHaveText([/Front Squat/]);
     });
 
     test("should not take the name of another of the user's workouts", async ({ page }) => {
       await createWorkout(page, "Legs", ["Back Squat"]);
       await goTo(page, "Workout Library");
       await page.getByRole("link", { name: "New workout" }).click();
-      await page.getByLabel("Workout name").fill("Legs");
       await pickMovements(page, ["Leg Press"]);
+      await nextStep(page);
+      await nextStep(page);
+      await page.getByLabel("Workout name").fill("Legs");
       await page.getByRole("button", { name: "Save workout" }).click();
 
       await expect(toast(page)).toContainText("You already have a workout with this name");
@@ -227,8 +336,10 @@ test.describe("Workout library", () => {
       const own = await getDb().movement.findFirstOrThrow({ where: { userId: null, name: "Bench Press" } });
 
       await newWorkoutForm(page);
-      await page.getByLabel("Workout name").fill("Sneaky");
       await pickMovements(page, ["Bench Press"]);
+      await nextStep(page);
+      await nextStep(page);
+      await page.getByLabel("Workout name").fill("Sneaky");
       await page.route("**/_serverFn/**", async (route) => {
         const body = route.request().postData();
         if (route.request().method() === "POST" && body?.includes(own.id)) {
@@ -284,8 +395,8 @@ test.describe("Workout library", () => {
     test("should show the plan first and start nothing until Start is pressed", async ({ page, user }) => {
       await createWorkout(page, "Push day", ["Bench Press", "Overhead Press"]);
       await page.getByRole("link", { name: "Edit Push day" }).click();
-      await exercise(page, "Bench Press").getByRole("button", { name: "90s" }).click();
-      await page.getByLabel("Weight of set 1 of Bench Press, optional").fill("100");
+      await pickRest(page, "Bench Press", "1:30");
+      await page.getByLabel("Weight of every set of Bench Press, optional").fill("100");
       await page.getByRole("button", { name: "Save workout" }).click();
 
       await page.getByRole("link", { name: "Start Push day" }).click();
@@ -314,10 +425,8 @@ test.describe("Workout library", () => {
     test("should log planned sets with or without a weight, and rest as the workout asks", async ({ page }) => {
       await createWorkout(page, "Push day", ["Bench Press"]);
       await page.getByRole("link", { name: "Edit Push day" }).click();
-      await page
-        .getByRole("group", { name: "Rest choices for Bench Press" })
-        .getByRole("button", { name: "90s" })
-        .click();
+      await pickRest(page, "Bench Press", "1:30");
+      await editEachSet(page, "Bench Press");
       await page.getByLabel("Weight of set 1 of Bench Press, optional").fill("100");
       await page.getByRole("button", { name: "Save workout" }).click();
       await page.getByRole("link", { name: "Start Push day" }).click();

@@ -142,16 +142,26 @@ export async function pickMovements(page: Page, names: string[]) {
   await expect(dialog).toHaveCount(0);
 }
 
-/** Builds and saves a workout in the library through the form: a name, movements, and optionally the weekdays. */
+/** Goes to the next step of a new workout: "Next: Sets & rest", then "Next: Name & save". */
+export async function nextStep(page: Page) {
+  await page.getByRole("button", { name: /^Next: / }).click();
+}
+
+/**
+ * Builds and saves a workout in the library through the three steps of a new workout: the movements, their series
+ * (left as they start), then the name and optionally the weekdays.
+ */
 export async function createWorkout(page: Page, name: string, movements: string[], weekdays: string[] = []) {
   await goTo(page, "Workout Library");
   await page
     .getByRole("link", { name: /^(New workout|Create your first workout)$/ })
     .first()
     .click();
-  await expect(page.getByRole("button", { name: "Save workout" })).toBeVisible();
-  await page.getByLabel("Workout name").fill(name);
+  await expect(page.getByRole("button", { name: "Next: Sets & rest" })).toBeVisible();
   await pickMovements(page, movements);
+  await nextStep(page);
+  await nextStep(page);
+  await page.getByLabel("Workout name").fill(name);
   for (const day of weekdays) await page.getByRole("button", { name: day, exact: true }).click();
   await page.getByRole("button", { name: "Save workout" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Workout Library" })).toBeVisible();
