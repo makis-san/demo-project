@@ -2,9 +2,21 @@ import { expect, type Page } from "@playwright/test";
 
 type Section = "Home" | "Current Workout" | "Workout Library" | "Workout History" | "Movements" | "Body Weight";
 
-/** Opens a page from the sidebar, the way a user would. */
+/**
+ * Opens a page from the sidebar, the way a user would. On a phone there is a dock with five items instead, and the two
+ * libraries are one of them: Library, then the Workouts / Movements switch at the top of it.
+ */
 export async function goTo(page: Page, section: Section) {
-  await page.getByRole("link", { name: section, exact: true }).click();
+  const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  if (phone && (section === "Movements" || section === "Workout Library")) {
+    const tab = page
+      .getByRole("navigation", { name: "Library" })
+      .getByRole("link", { name: section === "Movements" ? "Movements" : "Workouts", exact: true });
+    if (!(await tab.isVisible())) await page.getByRole("link", { name: "Library", exact: true }).click();
+    await tab.click();
+  } else {
+    await page.getByRole("link", { name: section, exact: true }).click();
+  }
   await expect(page.getByRole("heading", { level: 1, name: section })).toBeVisible();
 }
 

@@ -111,19 +111,103 @@ test.describe("Phone, signed in", () => {
     expect(scroll).toBeGreaterThan(client);
   });
 
-  test("should reach every page and log out from the bar at the bottom", async ({ page }) => {
-    for (const section of ["Workout History", "Movements", "Body Weight", "Current Workout"] as const) {
+  test("should have a dock of five, with the workout raised in the middle", async ({ page }) => {
+    const dock = page.getByRole("navigation", { name: "Main" });
+    await expect(dock.getByRole("link")).toHaveCount(5);
+    const names = ["Home", "Library", "Current Workout", "Workout History", "Body Weight"];
+    const boxes = [];
+    for (const name of names) {
+      const link = dock.getByRole("link", { name, exact: true });
+      await expect(link).toBeVisible();
+      boxes.push((await link.boundingBox())!);
+    }
+    // Left to right in that order, inside the window, at the bottom of it.
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].x).toBeGreaterThan(boxes[i - 1].x);
+    for (const box of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(phone.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(phone.height);
+      expect(box.y).toBeGreaterThan(phone.height / 2);
+    }
+    // The middle one is the workout, and no log out is in the dock.
+    const center = boxes[2].x + boxes[2].width / 2;
+    expect(Math.abs(center - phone.width / 2)).toBeLessThan(2);
+    await expect(page.getByRole("button", { name: "Log out" })).toHaveCount(0);
+    // The sidebar's names are not in a phone's page.
+    await expect(page.getByRole("link", { name: "Workout Library", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Movements", exact: true })).toHaveCount(0);
+  });
+
+  test("should reach Movements and the Workout Library through Library, and light it for both", async ({ page }) => {
+    const library = page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Library", exact: true });
+    await expect(library).not.toHaveAttribute("aria-current", "page");
+
+    await goTo(page, "Movements");
+    await expect(library).toHaveAttribute("aria-current", "page");
+    const switchLinks = page.getByRole("navigation", { name: "Library" }).getByRole("link");
+    await expect(switchLinks).toHaveText(["Workouts", "Movements"]);
+    await expect(switchLinks.nth(1)).toHaveAttribute("aria-current", "page");
+    await expect(switchLinks.nth(0)).not.toHaveAttribute("aria-current", "page");
+
+    await goTo(page, "Workout Library");
+    await expect(library).toHaveAttribute("aria-current", "page");
+    await expect(switchLinks.nth(0)).toHaveAttribute("aria-current", "page");
+    await expectNoSidewaysScroll(page);
+
+    // The switch is only for a phone: it is not on the other pages.
+    await goTo(page, "Body Weight");
+    await expect(library).not.toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: "Library" })).toHaveCount(0);
+  });
+
+  test("should reach every page from the dock, and log out from the account menu on Home", async ({ page }) => {
+    for (const section of ["Workout History", "Movements", "Body Weight", "Current Workout", "Home"] as const) {
       await goTo(page, section);
     }
 
+    // Log out is not in the dock. It is in the menu of the round button at the top right of Home.
+    await expect(page.getByRole("button", { name: "Log out" })).toHaveCount(0);
+    const account = page.getByRole("button", { name: "Account" });
+    const accountBox = await account.boundingBox();
+    expect(accountBox!.y).toBeLessThan(phone.height / 4);
+    expect(accountBox!.x + accountBox!.width).toBeLessThanOrEqual(phone.width);
+    expect(accountBox!.x).toBeGreaterThan(phone.width / 2);
+    await account.click();
+
     const logOut = page.getByRole("button", { name: "Log out" });
     const box = await logOut.boundingBox();
-    expect(box!.y + box!.height).toBeLessThanOrEqual(phone.height);
-    expect(box!.y).toBeGreaterThan(phone.height / 2);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(phone.width);
     await logOut.click();
 
     await expect(page).toHaveURL(/\/sign-in/);
     expect((await page.context().cookies()).find((c) => c.name === "session")).toBeUndefined();
+  });
+
+  test("should fit the filters of the movements in a sheet, and show how many are on", async ({ page }) => {
+    await goTo(page, "Movements");
+    // The list is on the first screen: the filters are behind one button.
+    const first = await page.getByRole("list", { name: "Movements" }).getByRole("listitem").first().boundingBox();
+    expect(first!.y).toBeLessThan(phone.height / 2);
+    await expect(page.getByRole("combobox", { name: "Filter by equipment" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Filters" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Filters" }).click();
+    const sheet = page.getByRole("dialog", { name: "Filters" });
+    await sheet.getByLabel("Filter by equipment").selectOption({ label: "Kettlebell" });
+    await sheet.getByRole("button", { name: /^Body wt/ }).click();
+    await expect(sheet.getByRole("button", { name: /^Show \d+ movements?$/ })).toBeVisible();
+    await sheet.getByRole("button", { name: /^Show \d+ movements?$/ }).click();
+    await expect(sheet).toHaveCount(0);
+
+    // Two filters are on, and the button says so.
+    await expect(page.getByRole("button", { name: /^Filters/ })).toContainText("2");
+    await expect(page.getByText("Nothing matches")).toBeVisible();
+    await page.getByRole("button", { name: /^Filters/ }).click();
+    await page.getByRole("dialog", { name: "Filters" }).getByRole("button", { name: "Clear" }).click();
+    await expect(page.getByRole("dialog", { name: "Filters" }).getByLabel("Filter by equipment")).toHaveValue("");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: /^Filters/ })).not.toContainText("2");
+    await expectNoSidewaysScroll(page);
   });
 });
 

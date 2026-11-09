@@ -421,8 +421,8 @@ test.describe("Workout library on a phone", () => {
     await noSideways();
     await goTo(page, "Home");
     await noSideways();
-    // Every item of the six-tab dock is on the screen and tappable.
-    for (const label of ["Home", "Current Workout", "Workout Library", "Workout History", "Movements", "Body Weight"]) {
+    // Every item of the five-item dock is on the screen and tappable.
+    for (const label of ["Home", "Library", "Current Workout", "Workout History", "Body Weight"]) {
       const box = await page.getByRole("link", { name: label, exact: true }).boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(390);
