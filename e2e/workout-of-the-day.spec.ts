@@ -94,7 +94,7 @@ test.describe("Home and the workout of the day", () => {
     await page.getByRole("link", { name: "Start Push day" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Push day" })).toBeVisible();
     await pressStart(page);
-    await page.getByRole("button", { name: "Log planned Bench Press set: 10 × no weight" }).first().click();
+    await page.getByRole("button", { name: "Log planned Bench Press set: 10 reps" }).first().click();
     await page.getByRole("button", { name: "Finish Workout" }).click();
     await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
 

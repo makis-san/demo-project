@@ -178,7 +178,7 @@ test.describe("Current workout: adding a movement", () => {
     await page.getByRole("link", { name: "Start Push day" }).click();
     await pressStart(page);
 
-    await page.getByRole("button", { name: "Log planned Overhead Press set: 10 × no weight" }).first().click();
+    await page.getByRole("button", { name: "Log planned Overhead Press set: 10 reps" }).first().click();
     await expect(setRows(page)).toHaveCount(1);
     await selectMovement(page, "Lateral Raise");
     await page.getByLabel("Weight", { exact: true }).fill("15");

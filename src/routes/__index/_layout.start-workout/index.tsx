@@ -4,7 +4,6 @@ import { ArrowLeft, Pencil, Play, Timer } from "lucide-react";
 import { useState } from "react";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { prefersReducedMotion, StartCountdown } from "@/components/start-countdown";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { MovementThumb } from "@/components/movement-figure/movement-thumb";
 import { startWorkoutServerFn } from "@/lib/workouts.server";
@@ -95,7 +94,7 @@ function StartWorkoutPage() {
       {preview.exercises.length === 0 ? (
         <p className="enter enter-1 text-muted">Add movements as you go.</p>
       ) : (
-        <Card className="enter enter-1 space-y-4 p-4 sm:p-6">
+        <div className="enter enter-1 space-y-4">
           {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
 
           <p className="num text-sm text-muted">
@@ -127,7 +126,7 @@ function StartWorkoutPage() {
                 <ol className="mt-2 grid gap-1 pl-1 sm:grid-cols-2">
                   {exercise.sets.map((set, i) => (
                     <li key={i} className="num flex items-center gap-2 text-sm text-muted">
-                      <span className="w-9 text-xs font-semibold text-faint">SET {i + 1}</span>
+                      <span className="w-9 text-xs text-muted">Set {i + 1}</span>
                       <span className="font-semibold text-chalk">{set.reps}</span> reps
                       {set.weight !== null && (
                         <>
@@ -141,7 +140,7 @@ function StartWorkoutPage() {
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
 
       {counting && (
@@ -154,7 +153,7 @@ function StartWorkoutPage() {
         />
       )}
 
-      <div className="enter enter-2 -mx-4 mt-auto flex flex-col gap-3 bg-linear-to-t from-ground from-70% to-transparent px-4 pt-6 pb-1 max-md:sticky max-md:bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5.25rem))] max-md:z-10 sm:flex-row sm:items-center md:static md:mx-0 md:mt-0 md:bg-none md:p-0">
+      <div className="enter enter-2 -mx-4 mt-auto flex flex-col gap-3 bg-linear-to-t from-ground from-70% to-transparent px-4 pt-6 pb-1 max-md:sticky max-md:bottom-0 max-md:z-10 max-md:-mb-24 max-md:pb-[max(6rem,calc(env(safe-area-inset-bottom)+5.25rem))] sm:flex-row sm:items-center md:static md:mx-0 md:mt-0 md:bg-none md:p-0">
         {preview.hasActiveWorkout ? (
           <>
             <Button size="lg" disabled className="w-full sm:w-auto">

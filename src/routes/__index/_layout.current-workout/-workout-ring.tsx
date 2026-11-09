@@ -279,6 +279,10 @@ type RingProps = {
   onAdd: () => void;
   /** The rest between sets, when one is running: on a phone its countdown is in the middle of the ring. */
   rest: { startedAt: number; endsAt: number } | null;
+  /** Moves the rest's end by this many seconds (the rest controls under the ring on a phone). */
+  onRestAdjust: (seconds: number) => void;
+  /** Puts the rest away: Skip, or Done once it is over. */
+  onRestStop: () => void;
 };
 
 const volumeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -459,7 +463,7 @@ export function WorkoutRing(props: RingProps) {
       <h3 className="text-sm font-medium text-muted max-md:sr-only sm:p-0">{props.title}</h3>
 
       {/* On a phone the ring is as wide as the screen, or as tall as is left above the set bar: it is read from a distance. */}
-      <div className="@container relative mx-auto mt-1 aspect-square w-[max(10rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,17.75rem)_-_var(--ring-reserve,0rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
+      <div className="@container relative mx-auto mt-1 aspect-square w-[max(10rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,17.75rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
         <svg
           ref={svgRef}
           viewBox="0 0 120 120"
@@ -681,58 +685,66 @@ export function WorkoutRing(props: RingProps) {
         </div>
       ) : (
         <>
-          <div className="mx-auto mt-3 max-md:mt-2 grid max-w-md grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1 sm:mt-5 sm:px-0 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-            <button
-              type="button"
-              onClick={() => {
-                if (!movesOn) fx.charge();
-                props.onNextSet();
-              }}
-              disabled={props.nextSetPending}
-              aria-label={`${nextSetLabel}: ${props.nextSetDetail}`}
-              className="press group flex h-14 min-w-0 items-center justify-center gap-2 rounded-full bg-white/[0.1] px-3 text-chalk transition-colors hover:bg-white/[0.15] disabled:opacity-60 max-md:h-12">
-              {movesOn ? (
-                <ChevronsRight
-                  key="on"
-                  className="icon-in h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-active:translate-x-1.5"
-                />
-              ) : (
-                <SkipForward
-                  key="set"
-                  className="h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-active:translate-x-1.5"
-                />
-              )}
-              <span className="flex min-w-0 flex-col items-start leading-tight">
-                <span key={nextSetLabel} className="orbit-swap text-sm font-semibold whitespace-nowrap">
-                  {nextSetLabel}
+          {props.rest ? (
+            // On a phone the rest is in the middle of the ring, and its controls take the place of Next set and Pause,
+            // so the ring does not shrink for a floating pill.
+            <RestControls rest={props.rest} onAdjust={props.onRestAdjust} onStop={props.onRestStop} />
+          ) : (
+            <div className="mx-auto mt-3 max-md:mt-2 grid max-w-md grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1 sm:mt-5 sm:px-0 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!movesOn) fx.charge();
+                  props.onNextSet();
+                }}
+                disabled={props.nextSetPending}
+                aria-label={`${nextSetLabel}: ${props.nextSetDetail}`}
+                className="press group flex h-14 min-w-0 items-center justify-center gap-2 rounded-full bg-white/[0.1] px-3 text-chalk transition-colors hover:bg-white/[0.15] disabled:opacity-60 max-md:h-12">
+                {movesOn ? (
+                  <ChevronsRight
+                    key="on"
+                    className="icon-in h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-active:translate-x-1.5"
+                  />
+                ) : (
+                  <SkipForward
+                    key="set"
+                    className="h-5 w-5 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-0.5 group-active:translate-x-1.5"
+                  />
+                )}
+                <span className="flex min-w-0 flex-col items-start leading-tight">
+                  <span key={nextSetLabel} className="orbit-swap text-sm font-semibold whitespace-nowrap">
+                    {nextSetLabel}
+                  </span>
+                  <span
+                    key={props.nextSetDetail}
+                    className="orbit-swap num max-w-full truncate text-[0.7rem] text-muted">
+                    {props.nextSetDetail}
+                  </span>
                 </span>
-                <span key={props.nextSetDetail} className="orbit-swap num max-w-full truncate text-[0.7rem] text-muted">
-                  {props.nextSetDetail}
-                </span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={props.onTogglePause}
-              disabled={!timeline}
-              aria-label={paused ? "Resume workout" : "Pause workout"}
-              aria-pressed={paused}
-              className={cn(
-                "press relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full max-md:h-16 max-md:w-16 bg-primary text-primary-ink shadow-[0_10px_30px_-10px_var(--color-primary)] transition-colors hover:bg-primary-strong disabled:opacity-40",
-                paused && "pause-halo",
-              )}>
-              {paused ? (
-                <Play key="play" className="icon-in h-7 w-7 translate-x-0.5" fill="currentColor" />
-              ) : (
-                <Pause key="pause" className="icon-in h-7 w-7" fill="currentColor" />
-              )}
-            </button>
-            {/* On a phone Finish is in the top bar. */}
-            <FinishButton {...props} className="max-md:hidden" />
-          </div>
+              </button>
+              <button
+                type="button"
+                onClick={props.onTogglePause}
+                disabled={!timeline}
+                aria-label={paused ? "Resume workout" : "Pause workout"}
+                aria-pressed={paused}
+                className={cn(
+                  "press relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full max-md:h-16 max-md:w-16 bg-primary text-primary-ink shadow-[0_10px_30px_-10px_var(--color-primary)] transition-colors hover:bg-primary-strong disabled:opacity-40",
+                  paused && "pause-halo",
+                )}>
+                {paused ? (
+                  <Play key="play" className="icon-in h-7 w-7 translate-x-0.5" fill="currentColor" />
+                ) : (
+                  <Pause key="pause" className="icon-in h-7 w-7" fill="currentColor" />
+                )}
+              </button>
+              {/* On a phone Finish is in the top bar. */}
+              <FinishButton {...props} className="max-md:hidden" />
+            </div>
+          )}
 
           {/* The smaller of the two: on to the next movement. It glows once every planned set of this one is done. */}
-          <div className={cn("mt-3 flex justify-center max-md:mt-2", props.rest && "max-md:hidden")}>
+          <div className="mt-3 flex justify-center max-md:mt-2 [@media(max-height:700px)]:max-md:hidden">
             <button
               type="button"
               onClick={props.onNext}
@@ -766,6 +778,42 @@ export function WorkoutRing(props: RingProps) {
 }
 
 /** The rest countdown in the middle of the ring on a phone, big enough to read from where the phone is propped. */
+/** The rest's controls on a phone, as big as Next set and Pause were: −15s, +15s and Skip, or Done once it is over. */
+function RestControls({
+  rest,
+  onAdjust,
+  onStop,
+}: {
+  rest: { startedAt: number; endsAt: number };
+  onAdjust: (seconds: number) => void;
+  onStop: () => void;
+}) {
+  const now = useNow(250, true);
+  const over = now !== null && rest.endsAt - now <= 0;
+  const soft =
+    "press num h-16 min-w-0 flex-1 rounded-full bg-white/[0.1] px-3 text-lg font-semibold text-chalk transition-colors hover:bg-white/[0.15]";
+  const strong =
+    "press num h-16 min-w-0 rounded-full px-6 text-lg font-semibold text-primary-ink transition-colors " +
+    (over ? "flex-1 bg-ok hover:bg-ok/90" : "flex-1 bg-primary hover:bg-primary-strong");
+  return (
+    <div className="mx-auto mt-2 flex max-w-md items-center gap-3 px-1 md:hidden">
+      {!over && (
+        <>
+          <button type="button" onClick={() => onAdjust(-15)} className={soft}>
+            −15s
+          </button>
+          <button type="button" onClick={() => onAdjust(15)} className={soft}>
+            +15s
+          </button>
+        </>
+      )}
+      <button type="button" onClick={onStop} className={strong}>
+        {over ? "Done" : "Skip"}
+      </button>
+    </div>
+  );
+}
+
 function RestReadout({ rest }: { rest: { startedAt: number; endsAt: number } }) {
   const now = useNow(250, true);
   const remaining = now === null ? null : Math.max(0, (rest.endsAt - now) / 1000);

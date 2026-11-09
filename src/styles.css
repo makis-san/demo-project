@@ -760,3 +760,19 @@
     transition: none;
   }
 }
+
+/*
+ * What the current workout's ring on a phone leaves room for besides the set bar: the top bar, the tabs and the
+ * controls (--ring-chrome), and where the ring's pane starts (--ring-pane-top). A short screen has shorter tabs and no
+ * "Next movement" row, so there the ring gets that height back.
+ */
+:root {
+  --ring-chrome: 17.75rem;
+  --ring-pane-top: 10rem;
+}
+@media (max-height: 700px) {
+  :root {
+    --ring-chrome: 14rem;
+    --ring-pane-top: 9rem;
+  }
+}

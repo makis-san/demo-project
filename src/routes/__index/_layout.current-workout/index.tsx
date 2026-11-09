@@ -1,4 +1,3 @@
-import { weightUnit } from "@/lib/units";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatDate, formatTime, fullDate, shortDate } from "@/lib/dates";
@@ -29,6 +28,7 @@ import {
   plannedProgress,
   PhoneComposer,
   PhoneTopBar,
+  plannedText,
   PlannedSets,
   RecapCard,
   RecentMovements,
@@ -267,12 +267,15 @@ function CurrentWorkoutPage() {
     mutationFn: async ({
       fromForm: _fromForm,
       restSeconds: _restSeconds,
+      next: _next,
       ...data
     }: {
       movementId: string;
       reps: number;
       weight: number;
       fromForm: boolean;
+      /** The plan's next set of this movement, if it has one: the form starts from it for the next set. */
+      next?: { reps: number; weight: number | null } | null;
       /** The rest a preset asks for after this set. Used by the rest timer only, never sent to the server. */
       restSeconds?: number | null;
     }) => {
@@ -281,8 +284,13 @@ function CurrentWorkoutPage() {
       return result;
     },
     onMutate: ({ movementId }) => moveTo(movementId, { resumes: true }),
-    onSuccess: (_result, { fromForm, restSeconds }) => {
-      if (fromForm) setReps("");
+    onSuccess: (_result, { fromForm, restSeconds, next }) => {
+      if (fromForm) {
+        // The next planned set of this movement, if the plan has one, is what the form shows for the next set. Without
+        // one the reps are cleared for the user to type, and the weight stays, as the next set is often the same.
+        setReps(next ? String(next.reps) : "");
+        if (next?.weight != null) setWeight(String(next.weight));
+      }
       buzz(12);
       timer.start(restSeconds ?? undefined);
     },
@@ -348,6 +356,9 @@ function CurrentWorkoutPage() {
       reps: parseInt(reps),
       weight: parseFloat(weight),
       fromForm: true,
+      next: workout?.plan?.sets.filter((set) => set.movement.id === selectedMovement)[
+        sets.filter((set) => set.movement.id === selectedMovement).length + 1
+      ],
     });
   };
 
@@ -438,8 +449,7 @@ function CurrentWorkoutPage() {
   const done = workout.plan ? plannedProgress(workout.plan.sets, sets) : new Set<string>();
   const nextPlanned = workout.plan?.sets.find((set) => set.movement.id === currentId && !done.has(set.id));
   const lastOfCurrent = [...sets].reverse().find((set) => set.movement.id === currentId);
-  const setText = (set: { reps: number; weight: number | null }) =>
-    `${set.reps} × ${set.weight === null ? "no weight" : `${set.weight} ${weightUnit}`}`;
+  const setText = plannedText;
   const movesOn = groups.some((g) => g.movement.id === currentId) && !nextPlanned;
   const nextSetDetail = !currentId
     ? "Pick a movement"
@@ -502,11 +512,6 @@ function CurrentWorkoutPage() {
       style={
         {
           ...(composerHeight ? { "--composer-h": `${composerHeight}px` } : {}),
-          // What the ring leaves room for on a phone besides the set bar: the top bar, the tabs and the controls, and
-          // the rest timer's pill while it floats over the controls.
-          "--ring-chrome": "17.75rem",
-          // The rest timer's pill floats over the bottom of the ring's pane while it runs.
-          "--ring-reserve": timer.rest ? "4.75rem" : "0rem",
         } as React.CSSProperties
       }>
       {confetti}
@@ -546,7 +551,7 @@ function CurrentWorkoutPage() {
             label: "Ring",
             content: (
               // On a phone the ring and its controls are centred in what the top bar, the tabs and the set bar leave.
-              <div className="space-y-4 max-md:flex max-md:min-h-[calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-pane-top,10rem)_-_var(--ring-reserve,0rem))] max-md:flex-col max-md:justify-center">
+              <div className="space-y-4 max-md:flex max-md:min-h-[calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-pane-top,10rem))] max-md:flex-col max-md:justify-center">
                 <WorkoutRing
                   timeline={timeline.timeline}
                   title={formatDate(workout.startedAt, timeZone, fullDate)}
@@ -567,6 +572,8 @@ function CurrentWorkoutPage() {
                   finishing={completeWorkoutMutation.isPending}
                   complete={complete}
                   rest={phone ? timer.rest : null}
+                  onRestAdjust={timer.adjust}
+                  onRestStop={timer.stop}
                   onAdd={() => {
                     setExtending(true);
                     setChoosing(true);

@@ -138,7 +138,8 @@ export function RestTimerPill({
   return (
     <div
       className={cn(
-        "glass glass-strong enter fixed inset-x-3 z-30 flex items-center gap-3 rounded-[1.5rem] py-2 pr-2 pl-2.5",
+        // On a phone the countdown and its controls are in the ring (the pill would take height from it).
+        "glass glass-strong enter fixed inset-x-3 z-30 flex items-center gap-3 rounded-[1.5rem] py-2 pr-2 pl-2.5 max-md:hidden",
         "bottom-[calc(var(--composer-h,4.5rem)+0.5rem)] md:inset-x-auto md:right-6 md:bottom-6 md:w-[22rem]",
         over && "border-ok/50",
       )}>

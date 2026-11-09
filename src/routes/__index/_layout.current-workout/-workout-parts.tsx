@@ -166,7 +166,7 @@ function AddButton({ composer, className }: { composer: ComposerProps; className
 }
 
 /** The weight and reps fields, with the − and + beside each. The same fields in both composers, so tests find one. */
-function weightField(composer: ComposerProps, className: string) {
+function weightField(composer: ComposerProps, className: string, style?: React.CSSProperties) {
   return (
     <Input
       type="number"
@@ -179,10 +179,11 @@ function weightField(composer: ComposerProps, className: string) {
       max={9999.99}
       step="0.01"
       className={className}
+      style={style}
     />
   );
 }
-function repsField(composer: ComposerProps, className: string) {
+function repsField(composer: ComposerProps, className: string, style?: React.CSSProperties) {
   return (
     <Input
       type="number"
@@ -194,6 +195,7 @@ function repsField(composer: ComposerProps, className: string) {
       min={1}
       max={1000}
       className={className}
+      style={style}
     />
   );
 }
@@ -284,7 +286,7 @@ export function PhoneComposer({
 
   return (
     <div ref={bar} className="fixed inset-x-0 bottom-0 z-30 md:hidden">
-      <div className="glass glass-strong rounded-t-[1.5rem] rounded-b-none border-x-0 border-b-0 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="glass glass-strong rounded-t-[1.5rem] rounded-b-none border-x-0 border-b-0 border-t border-t-line-strong bg-ground/95 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [@media(max-height:700px)]:pt-2">
         {full && selected ? (
           <form onSubmit={full.onSubmit} className="space-y-2">
             <div role="group" aria-label="Selected movement">
@@ -292,12 +294,14 @@ export function PhoneComposer({
                 type="button"
                 onClick={onChoose}
                 aria-label={`Change movement, ${selected.name}`}
-                className="press flex min-h-11 w-full items-center gap-3 rounded-2xl px-1 text-left">
+                className="press flex min-h-11 w-full items-center gap-3 rounded-2xl px-1 text-left [@media(max-height:700px)]:min-h-8">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-base leading-tight font-semibold text-chalk font-stretch-[108%]">
                     {selected.name}
                   </span>
-                  <span className="num block min-h-4 truncate text-xs text-muted">{shortHint(full.history)}</span>
+                  <span className="num block min-h-4 truncate text-xs text-muted [@media(max-height:700px)]:hidden">
+                    {shortHint(full.history)}
+                  </span>
                 </span>
                 <ChevronsUpDown className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
               </button>
@@ -305,10 +309,16 @@ export function PhoneComposer({
             <div className="grid grid-cols-2 gap-2">
               <CompactDial
                 label={`Weight · ${weightUnit}`}
-                field={weightField(full, compactInputClass)}
+                unit={weightUnit}
+                field={weightField(full, compactInputClass, digits(full.weight))}
                 {...weightSteps(full)}
               />
-              <CompactDial label="Reps" field={repsField(full, compactInputClass)} {...repsSteps(full)} />
+              <CompactDial
+                label="Reps"
+                unit="reps"
+                field={repsField(full, compactInputClass, digits(full.reps))}
+                {...repsSteps(full)}
+              />
             </div>
             {full.needsBodyWeight}
             <div className="flex gap-2">
@@ -328,12 +338,16 @@ export function PhoneComposer({
 }
 
 const compactInputClass =
-  "h-11 rounded-xl border-transparent bg-transparent px-0 text-center text-xl font-bold tracking-tight font-stretch-[88%] " +
+  "h-11 min-w-0 flex-1 rounded-xl border-transparent bg-transparent px-0 text-center text-xl [@media(max-height:700px)]:w-(--digits) [@media(max-height:700px)]:flex-none font-bold tracking-tight font-stretch-[88%] " +
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none " +
   "hover:border-transparent focus-visible:bg-black/30";
 
+/** The width of a number in the stepper on a short phone, where the unit sits right after it. */
+const digits = (value: string) => ({ "--digits": `${Math.max(value.length, 1) + 0.5}ch` }) as React.CSSProperties;
+
 function CompactDial({
   label,
+  unit,
   field,
   onDown,
   onUp,
@@ -341,6 +355,8 @@ function CompactDial({
   upText,
 }: {
   label: string;
+  /** Shown after the number when the label above is left out for a short screen. */
+  unit: string;
   field: React.ReactNode;
   onDown: () => void;
   onUp: () => void;
@@ -348,7 +364,7 @@ function CompactDial({
   upText: string;
 }) {
   return (
-    <div className="rounded-2xl bg-black/25 px-1 pt-1.5 pb-1">
+    <div className="rounded-2xl bg-black/25 px-1 pt-1.5 pb-1 [@media(max-height:700px)]:pt-1">
       <p
         className="text-center text-[11px] leading-none text-muted [@media(max-height:700px)]:hidden"
         aria-hidden="true">
@@ -358,7 +374,14 @@ function CompactDial({
         <StepButton direction="down" onStep={onDown} className="h-11 w-11 border-transparent bg-transparent">
           {downText}
         </StepButton>
-        <div className="min-w-0 flex-1">{field}</div>
+        <div className="flex min-w-0 flex-1 items-center justify-center [@media(max-height:700px)]:gap-1">
+          {field}
+          <span
+            aria-hidden="true"
+            className="num hidden shrink-0 text-xs font-medium text-muted [@media(max-height:700px)]:inline">
+            {unit}
+          </span>
+        </div>
         <StepButton direction="up" onStep={onUp} className="h-11 w-11 border-transparent bg-transparent">
           {upText}
         </StepButton>
@@ -565,14 +588,30 @@ export type PlannedSet = {
   movement: LoggedSet["movement"];
 };
 
-const plannedText = (set: { reps: number; weight: number | null }) =>
-  `${set.reps} × ${set.weight === null ? "no weight" : `${set.weight} ${weightUnit}`}`;
+/** A planned set in words: "10 reps", or "10 × 100 lbs" when it has a weight. */
+export const plannedText = (set: { reps: number; weight: number | null }) =>
+  set.weight === null ? `${set.reps} reps` : `${set.reps} × ${set.weight} ${weightUnit}`;
 
 /**
  * Which planned sets are already done. Nothing is stored for it: the nth planned set of a movement is done once the
  * workout has n sets of that movement, however the user logged them (with the old numbers or changed ones). So a
  * reload keeps the ticks, and removing a logged set un-ticks the last one.
  */
+/** The set that was logged for each planned set that is done: the nth of a movement for its nth planned set. */
+export function plannedLogged(plan: PlannedSet[], logged: LoggedSet[]) {
+  const byMovement = new Map<string, LoggedSet[]>();
+  for (const set of logged) byMovement.set(set.movement.id, [...(byMovement.get(set.movement.id) ?? []), set]);
+  const seen = new Map<string, number>();
+  const result = new Map<string, LoggedSet>();
+  for (const planned of plan) {
+    const n = seen.get(planned.movement.id) ?? 0;
+    seen.set(planned.movement.id, n + 1);
+    const set = byMovement.get(planned.movement.id)?.[n];
+    if (set) result.set(planned.id, set);
+  }
+  return result;
+}
+
 export function plannedProgress(plan: PlannedSet[], logged: LoggedSet[]) {
   const loggedCount = new Map<string, number>();
   for (const set of logged) loggedCount.set(set.movement.id, (loggedCount.get(set.movement.id) ?? 0) + 1);
@@ -617,6 +656,7 @@ export function PlannedSets({
   onFocusMovement?: (movement: PlannedSet["movement"]) => void;
 }) {
   const done = plannedProgress(plan, logged);
+  const loggedFor = plannedLogged(plan, logged);
   const groups: { movement: PlannedSet["movement"]; sets: PlannedSet[] }[] = [];
   for (const set of plan) {
     const group = groups.find((g) => g.movement.id === set.movement.id);
@@ -692,6 +732,8 @@ export function PlannedSets({
               <ul className="space-y-1" aria-label={`Planned ${movement.name} sets`}>
                 {sets.map((set) => {
                   const isDone = done.has(set.id);
+                  // A done set shows what was logged, which may not be what was planned.
+                  const shown = loggedFor.get(set.id) ?? set;
                   return (
                     <li
                       key={set.id}
@@ -709,12 +751,11 @@ export function PlannedSets({
                         <Check key={String(isDone)} className={cn("h-3.5 w-3.5", isDone && "orbit-pop")} />
                       </span>
                       <span className="num min-w-0 flex-1 text-sm whitespace-nowrap text-muted">
-                        <span className="text-lg font-bold text-chalk">{set.reps}</span> reps ×{" "}
-                        {set.weight === null ? (
-                          <span className="text-faint">no weight</span>
-                        ) : (
+                        <span className="text-lg font-bold text-chalk">{shown.reps}</span> reps
+                        {shown.weight !== null && (
                           <>
-                            <span className="text-lg font-bold text-chalk">{set.weight}</span> {weightUnit}
+                            {" "}
+                            × <span className="text-lg font-bold text-chalk">{shown.weight}</span> {weightUnit}
                           </>
                         )}
                       </span>
