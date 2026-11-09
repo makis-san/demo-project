@@ -354,6 +354,35 @@ export const getWorkoutHistoryServerFn = createServerFn()
   });
 
 /**
+ * The user's latest completed workout in short: when it was, what it was started from, and what it held. The home
+ * screen shows it as a line and offers to repeat it, without loading a page of history for that.
+ */
+export const getLastWorkoutServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }) => {
+    const prisma = await getServerSidePrismaClient();
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: { not: null } },
+      orderBy: [{ completedAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        completedAt: true,
+        preset: { select: { name: true } },
+        sets: { orderBy: setOrder, select: { movement: { select: { name: true } } } },
+      },
+    });
+    if (!workout?.completedAt) return null;
+    const movements = [...new Set(workout.sets.map((set) => set.movement.name))];
+    return {
+      id: workout.id,
+      completedAt: workout.completedAt,
+      presetName: workout.preset?.name ?? null,
+      setCount: workout.sets.length,
+      movements,
+    };
+  });
+
+/**
  * Every movement that is in a completed workout, by name. The history page uses it for the columns
  * of the table and the chart's movement list. It cannot come from the pages, because they hold only
  * the newest workouts.
