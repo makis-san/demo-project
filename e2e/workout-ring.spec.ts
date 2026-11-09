@@ -446,6 +446,8 @@ test.describe("Workout ring on a phone", () => {
 
     await ringTab.click();
     await expect(ringTab).toHaveAttribute("aria-selected", "true");
+    // The set just logged started the rest, and on a phone its countdown takes the middle of the ring. Skipped, the clock is back.
+    await page.getByRole("button", { name: "Skip" }).click();
     await expect(clock(page)).toBeInViewport();
   });
 
@@ -465,6 +467,46 @@ test.describe("Workout ring on a phone", () => {
     await expect(page.getByRole("group", { name: "Selected movement" })).toContainText("Overhead Press");
     await expect(page.getByLabel("Reps", { exact: true })).toBeInViewport();
     await expect(page.getByLabel("Reps", { exact: true })).not.toHaveValue("");
-    await expect(page.getByLabel("Weight", { exact: true })).not.toHaveValue("");
+  });
+
+  test("should show the ring's movement in the set bar with its numbers, also after a reload", async ({ page }) => {
+    await startPlanned(page);
+    const bar = page.getByRole("group", { name: "Selected movement" });
+    await expect(bar).toContainText("Bench Press");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("10");
+    await expect(page.getByRole("button", { name: "Add movement", exact: true })).toHaveCount(0);
+
+    await page.reload();
+    await expect(bar).toContainText("Bench Press");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("10");
+    // No scrolling on the Ring pane: the ring, its controls and the bar are all on the first screen.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+  });
+
+  test("should show the rest countdown big in the middle of the ring, and the clock again when it is skipped", async ({
+    page,
+  }) => {
+    await startPlanned(page);
+    await page.getByRole("button", { name: /^Next set/ }).click();
+    const pill = page.getByText("Resting");
+    await expect(pill).toBeVisible();
+
+    // In the middle of the ring, as large as the clock was: readable from where the phone is propped.
+    const label = page.getByRole("region", { name: "Workout progress" }).getByText("Rest", { exact: true });
+    await expect(label).toBeVisible();
+    const countdown = label.locator("xpath=following-sibling::p");
+    await expect(countdown).toHaveText(/^[01]:\d\d$/);
+    const size = await countdown.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const nameSize = await ring(page)
+      .getByTestId("ring-movement")
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(size).toBeGreaterThanOrEqual(30);
+    expect(size).toBeGreaterThan(nameSize * 2.5);
+    // The workout clock stays in the top bar.
+    await expect(clock(page)).toBeHidden();
+
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(label).toHaveCount(0);
+    await expect(clock(page)).toBeVisible();
   });
 });

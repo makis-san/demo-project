@@ -162,7 +162,7 @@ function RouteComponent() {
       <main
         className={cn(
           "mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pt-6 md:px-2 md:pt-8 md:pb-10",
-          focus ? "max-md:pt-0 max-md:pb-6" : "pb-32",
+          focus ? "max-md:pt-0 max-md:pb-0" : "pb-32",
         )}>
         <Outlet />
       </main>

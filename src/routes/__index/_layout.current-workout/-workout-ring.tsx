@@ -459,7 +459,7 @@ export function WorkoutRing(props: RingProps) {
       <h3 className="text-sm font-medium text-muted max-md:sr-only sm:p-0">{props.title}</h3>
 
       {/* On a phone the ring is as wide as the screen, or as tall as is left above the set bar: it is read from a distance. */}
-      <div className="@container relative mx-auto mt-1 aspect-square w-[max(12rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,14rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
+      <div className="@container relative mx-auto mt-1 aspect-square w-[max(10rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,17.75rem)_-_var(--ring-reserve,0rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
         <svg
           ref={svgRef}
           viewBox="0 0 120 120"
@@ -610,12 +610,15 @@ export function WorkoutRing(props: RingProps) {
           )}
         </svg>
 
-        <div className="absolute inset-[21%] flex flex-col items-center justify-center text-center">
+        {/* On a phone everything in the middle is sized from the ring itself (cqw) and kept inside the inner dashed circle:
+            a box 52% of the ring wide, with the name on two lines at most and no small print. */}
+        <div className="absolute inset-[21%] flex flex-col items-center justify-center text-center max-md:inset-[24%]">
           <p
             key={props.complete ? "complete" : paused ? "paused" : "running"}
             className={cn(
-              "orbit-swap text-[max(0.7rem,3.2cqw)] font-medium text-muted max-md:text-[3.6cqw]",
-              props.rest && "max-md:hidden",
+              "orbit-swap text-[max(0.7rem,3.2cqw)] font-medium text-muted max-md:text-[4cqw] max-md:leading-none",
+              // The clock needs no label on a phone. Paused and the end of the plan say so, above it.
+              (props.rest || !(paused || props.complete)) && "max-md:hidden",
               props.complete && "text-ok",
               paused && !props.complete && "text-accent",
             )}>
@@ -626,7 +629,7 @@ export function WorkoutRing(props: RingProps) {
             aria-label="Workout time"
             className={cn(
               "num mt-[1.5cqw] leading-none font-bold tracking-tight text-chalk font-stretch-[88%]",
-              elapsed >= 3_600_000 ? "text-[13cqw] max-md:text-[14.5cqw]" : "text-[18cqw] max-md:text-[21cqw]",
+              elapsed >= 3_600_000 ? "text-[13cqw] max-md:text-[11.5cqw]" : "text-[18cqw] max-md:text-[18.5cqw]",
               paused && "clock-hold",
               // On a phone a rest takes the middle: its countdown is the big number, and the workout clock is in the top bar.
               props.rest && "max-md:hidden",
@@ -635,23 +638,27 @@ export function WorkoutRing(props: RingProps) {
           </p>
           {props.rest && <RestReadout rest={props.rest} />}
           {layout?.plannedMs != null && (
-            <p className="num mt-[1cqw] text-[max(0.75rem,3.4cqw)] text-faint">of about {minutes(layout.plannedMs)}</p>
+            <p className="num mt-[1cqw] text-[max(0.75rem,3.4cqw)] text-faint max-md:hidden">
+              of about {minutes(layout.plannedMs)}
+            </p>
           )}
           <p
             key={currentId ?? "warm-up"}
             data-testid="ring-movement"
-            className="orbit-swap mt-[3cqw] flex max-w-full items-center gap-[1.5cqw] text-[max(1rem,5.2cqw)] font-semibold text-chalk max-md:text-[7cqw]">
+            className="orbit-swap mt-[3cqw] flex max-w-full items-center gap-[1.5cqw] text-[max(1rem,5.2cqw)] font-semibold text-chalk max-md:mt-[2cqw] max-md:items-start max-md:text-[5.6cqw] max-md:leading-[1.15]">
             <span
               aria-hidden="true"
-              className="h-[0.5em] w-[0.5em] shrink-0 rounded-full"
+              className="h-[0.5em] w-[0.5em] shrink-0 rounded-full max-md:hidden"
               style={{ background: colorOf(currentId) }}
             />
-            <span className="truncate">{nameOf(currentId)}</span>
+            <span className="truncate max-md:line-clamp-2 max-md:text-balance max-md:whitespace-normal">
+              {nameOf(currentId)}
+            </span>
           </p>
           <p
             key={setLine}
             className={cn(
-              "num orbit-swap text-[max(0.75rem,3.6cqw)] max-md:text-[4.6cqw]",
+              "num orbit-swap text-[max(0.75rem,3.6cqw)] max-md:mt-[1cqw] max-md:text-[4.4cqw] max-md:leading-none",
               movementDone ? "font-semibold text-ok" : "text-muted",
             )}>
             {setLine}
@@ -765,10 +772,12 @@ function RestReadout({ rest }: { rest: { startedAt: number; endsAt: number } }) 
   const over = remaining !== null && remaining <= 0;
   return (
     <div aria-hidden="true" className="orbit-swap flex flex-col items-center md:hidden">
-      <p className={cn("text-[3.6cqw] font-medium", over ? "text-ok" : "text-muted")}>{over ? "Rest over" : "Rest"}</p>
+      <p className={cn("text-[4cqw] leading-none font-medium", over ? "text-ok" : "text-muted")}>
+        {over ? "Rest over" : "Rest"}
+      </p>
       <p
         className={cn(
-          "num mt-[1.5cqw] text-[21cqw] leading-none font-bold tracking-tight font-stretch-[88%]",
+          "num mt-[1.5cqw] text-[18.5cqw] leading-none font-bold tracking-tight font-stretch-[88%]",
           over ? "text-ok" : "text-chalk",
         )}>
         {formatClock(Math.ceil(remaining ?? (rest.endsAt - rest.startedAt) / 1000))}

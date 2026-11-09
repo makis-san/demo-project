@@ -167,7 +167,9 @@ function WorkoutHistoryPage() {
           ) : (
             <>
               {hasActiveWorkout && (
-                <p className="mb-3 px-1 text-xs text-faint">Finish your workout in progress to repeat a past one.</p>
+                <p className="mb-3 px-1 text-xs text-faint">
+                  You have a workout in progress. Finish it to start a new one from a past workout.
+                </p>
               )}
               <WorkoutJournal
                 workouts={workouts}

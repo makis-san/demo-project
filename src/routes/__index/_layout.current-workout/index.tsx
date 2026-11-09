@@ -183,22 +183,55 @@ function CurrentWorkoutPage() {
    * latest body weight, and the last top set from earlier workouts (that one arrives later, see the effect below).
    * Picking a different movement replaces what was typed; picking the same one again only fills what is empty.
    */
-  const handleMovementChange = (movement: MovementOption, { reveal = true, resumes = false } = {}) => {
+  const applySelection = (movement: MovementOption) => {
     const same = selected?.id === movement.id;
     const own = (set: { movement: { id: string } }) => set.movement.id === movement.id;
     const last = [...sets].reverse().find(own);
     const planned = last ? undefined : workout?.plan?.sets.filter(own)[sets.filter(own).length];
-    let nextWeight = last ? String(last.weight) : planned?.weight != null ? String(planned.weight) : "";
+    const planWeight = workout?.plan?.sets.filter(own)[sets.filter(own).length]?.weight;
+    // A body-weight movement starts from the latest body weight (the added weight is typed on top), unless the plan has
+    // a weight for it. Any other movement starts from this session's last set, then the plan's.
+    const bodyWeightStart = movement.isBodyWeight && latestBodyWeight !== null ? String(latestBodyWeight) : null;
+    const nextWeight =
+      bodyWeightStart !== null
+        ? planWeight != null
+          ? String(planWeight)
+          : bodyWeightStart
+        : last
+          ? String(last.weight)
+          : planWeight != null
+            ? String(planWeight)
+            : "";
     const nextReps = last ? String(last.reps) : planned ? String(planned.reps) : "";
-    if (nextWeight === "" && movement.isBodyWeight && latestBodyWeight !== null) nextWeight = String(latestBodyWeight);
     const finalWeight = same && weight !== "" ? weight : nextWeight;
     setWeight(finalWeight);
     setReps(same && reps !== "" ? reps : nextReps);
     prefilled.current = finalWeight !== "" ? movement.id : null;
     setSelected(movement);
+  };
+  const handleMovementChange = (movement: MovementOption, { reveal = true, resumes = false } = {}) => {
+    applySelection(movement);
     moveTo(movement.id, { resumes });
     if (reveal) revealComposer();
   };
+
+  // The movement the ring is on is the one the set bar is for. The page starts with nothing picked (after a reload, or
+  // when a preset's workout has just begun), so the ring's movement is picked for it, with its numbers filled in.
+  // Only a workout with nothing to log yet (the ring on its warm-up) leaves the bar as "Add movement".
+  const ringMovementId = timeline.timeline ? currentSection(timeline.timeline).movementId : null;
+  const ringMovement =
+    ringMovementId === null
+      ? undefined
+      : [...(workout?.plan?.sets ?? []), ...sets].find((set) => set.movement.id === ringMovementId)?.movement;
+  // A new workout starts with nothing picked.
+  useEffect(() => {
+    setSelected(null);
+    prefilled.current = null;
+  }, [workout?.id]);
+  useEffect(() => {
+    if (selected === null && ringMovement) applySelection(ringMovement);
+    // Only while nothing is picked: a pick of its own is applied to the ring in the same go.
+  }, [selected, ringMovement?.id]);
 
   // A server function refuses when the page is out of date, for example when another tab already completed the
   // workout or removed the set. Reload the workout when an action fails too, so the page shows what the server has.
@@ -465,13 +498,15 @@ function CurrentWorkoutPage() {
 
   return (
     <div
-      className="space-y-6 max-md:space-y-4 max-md:pb-[calc(var(--composer-h,4.5rem)+1rem)]"
+      className="space-y-6 max-md:space-y-4 max-md:pb-[calc(var(--composer-h,4.5rem)+0.5rem)]"
       style={
         {
           ...(composerHeight ? { "--composer-h": `${composerHeight}px` } : {}),
           // What the ring leaves room for on a phone besides the set bar: the top bar, the tabs and the controls, and
           // the rest timer's pill while it floats over the controls.
-          "--ring-chrome": timer.rest ? "18.5rem" : "16.5rem",
+          "--ring-chrome": "17.75rem",
+          // The rest timer's pill floats over the bottom of the ring's pane while it runs.
+          "--ring-reserve": timer.rest ? "4.75rem" : "0rem",
         } as React.CSSProperties
       }>
       {confetti}
@@ -510,7 +545,8 @@ function CurrentWorkoutPage() {
             id: "ring",
             label: "Ring",
             content: (
-              <div className="space-y-4">
+              // On a phone the ring and its controls are centred in what the top bar, the tabs and the set bar leave.
+              <div className="space-y-4 max-md:flex max-md:min-h-[calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-pane-top,10rem)_-_var(--ring-reserve,0rem))] max-md:flex-col max-md:justify-center">
                 <WorkoutRing
                   timeline={timeline.timeline}
                   title={formatDate(workout.startedAt, timeZone, fullDate)}
@@ -530,7 +566,7 @@ function CurrentWorkoutPage() {
                   onFinish={completeWorkout}
                   finishing={completeWorkoutMutation.isPending}
                   complete={complete}
-                  rest={timer.rest}
+                  rest={phone ? timer.rest : null}
                   onAdd={() => {
                     setExtending(true);
                     setChoosing(true);
