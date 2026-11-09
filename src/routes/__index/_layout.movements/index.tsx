@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { movementsQueryKey, movementsQueryOptions } from "./-queries/movements";
 import { Plus, Search, X } from "lucide-react";
+import { toast } from "react-toastify";
 import { PageHeader } from "@/components/page-header";
 import { MusclePicker, type MuscleSelection } from "@/components/muscle-picker";
 import { CategoryTabs } from "@/components/category-tabs";
@@ -66,8 +67,9 @@ function MovementsPage() {
       if (!result.success) throw new Error(result.error);
       return result;
     },
-    onSuccess: (_result, input) => {
+    onSuccess: (result, input) => {
       queryClient.invalidateQueries({ queryKey: movementsQueryKey });
+      if (result.restored) toast.success(`${result.movement.name} is back, with its history.`);
       setName("");
       setIsBodyWeight(false);
       setNewEquipment("");

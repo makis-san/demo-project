@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { ArrowLeft, Trash2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { deleteMovementServerFn } from "@/lib/movements.server";
 import { PageHeader } from "@/components/page-header";
 import { MovementFigure } from "@/components/movement-figure/movement-figure";
 import { BodyMap, type MuscleRole } from "@/components/movement-figure/body-map";
@@ -11,7 +14,7 @@ import { weightUnit } from "@/lib/units";
 import { equipmentLabels, muscleLabels, type MuscleGroup } from "@/lib/muscles";
 import { cn } from "@/lib/utils";
 import { progressionQueryOptions } from "../_layout.workout-history/-queries/workout-history";
-import { movementQueryOptions } from "./-queries/movements";
+import { movementQueryOptions, movementsQueryKey, movementsQueryOptions } from "./-queries/movements";
 
 export const Route = createFileRoute("/__index/_layout/movements/$movementId")({
   loader: async ({ context, params }) => {
@@ -98,6 +101,7 @@ function MovementPage() {
               {movement.equipment && <Tag>{equipmentLabels[movement.equipment]}</Tag>}
               {movement.isBodyWeight && <Tag tone="ok">Body weight</Tag>}
               {!movement.isBuiltIn && <Tag>Yours</Tag>}
+              {movement.isArchived && <Tag>Archived</Tag>}
             </div>
           </div>
 
@@ -140,7 +144,91 @@ function MovementPage() {
           )}
         </Card>
       </div>
+
+      {!movement.isBuiltIn && (
+        <DeleteMovement
+          movementId={movementId}
+          name={movement.name}
+          inUse={movement.inUse}
+          archived={movement.isArchived}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Deleting the user's own movement, confirmed in the page: a browser dialog would block the end-to-end tests and a
+ * tap on the wrong thing on a phone. A movement that is in a workout or a preset is archived by the server, not erased,
+ * and the text says so before the user decides.
+ */
+function DeleteMovement({
+  movementId,
+  name,
+  inUse,
+  archived,
+}: {
+  movementId: string;
+  name: string;
+  inUse: boolean;
+  archived: boolean;
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      const result = await deleteMovementServerFn({ data: { movementId } });
+      // The router shows a toast for any error thrown from a mutation.
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: (result) => {
+      // Take it out of the cached list now, so the library does not show it for a moment while the list reloads.
+      queryClient.setQueryData(movementsQueryOptions().queryKey, (list) => list?.filter((m) => m.id !== movementId));
+      navigate({ to: "/movements" });
+      queryClient.invalidateQueries({ queryKey: movementsQueryKey });
+      toast.success(result.outcome === "archived" ? `${name} archived. Your history keeps it.` : `${name} deleted.`);
+    },
+  });
+
+  return (
+    <Card className="enter enter-3 space-y-3 p-4 sm:p-5">
+      <h2 className="eyebrow">Remove from your library</h2>
+      {archived ? (
+        <p className="text-sm text-muted">
+          This movement is archived. It is hidden from the library and the pickers, and your history keeps it. Create a
+          movement with the same name to bring it back.
+        </p>
+      ) : confirming ? (
+        <div className="space-y-3">
+          <p role="alert" className="text-sm text-chalk">
+            {inUse
+              ? `${name} is in your workouts or workout library, so it will be archived: hidden from the library and the pickers, and kept in your history.`
+              : `Delete ${name}? It is not in any workout, and this cannot be undone.`}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto"
+              onClick={() => remove.mutate()}
+              disabled={remove.isPending}>
+              <Trash2 className="h-4 w-4" />
+              {remove.isPending ? "Removing..." : inUse ? "Yes, archive it" : "Yes, delete it"}
+            </Button>
+            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setConfirming(false)}>
+              Keep it
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="destructive" className="w-full sm:w-auto" onClick={() => setConfirming(true)}>
+          <Trash2 className="h-4 w-4" />
+          Delete movement
+        </Button>
+      )}
+    </Card>
   );
 }
 

@@ -3,7 +3,7 @@ import { getServerSidePrismaClient, isUniqueViolation } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
 import { errorMiddleware } from "@/lib/errors.server";
 import { resolveTimeZone } from "@/lib/request-timezone.server";
-import { visibleMovements } from "@/lib/movements.server";
+import { pickableMovements, visibleMovements } from "@/lib/movements.server";
 import { repsSchema, weightSchema } from "@/lib/validation";
 import type { Equipment, MuscleGroup } from "@/lib/muscles";
 import { maxExercisesPerPreset, maxSetsPerExercise, restSecondsSchema } from "@/lib/presets";
@@ -56,8 +56,22 @@ export const savePresetServerFn = createServerFn({ method: "POST" })
     const userId = context.user.id;
 
     // Every movement must be one the user can see: their own or a built-in. A foreign id is the same as an unknown one.
+    // An archived one is refused for a new place, but a preset that already holds it keeps it when it is saved again.
     const ids = [...new Set(data.exercises.map((e) => e.movementId))];
-    const visible = await prisma.movement.count({ where: { id: { in: ids }, ...visibleMovements(userId) } });
+    const visible = await prisma.movement.count({
+      where: {
+        id: { in: ids },
+        AND: [
+          visibleMovements(userId),
+          {
+            OR: [
+              { archivedAt: null },
+              ...(data.id ? [{ presetExercises: { some: { presetId: data.id, preset: { userId } } } }] : []),
+            ],
+          },
+        ],
+      },
+    });
     if (visible !== ids.length) return { success: false as const, error: "Movement not found" };
 
     if (data.id) {
@@ -166,14 +180,17 @@ export const getPresetServerFn = createServerFn()
     };
   });
 
-/** Movements by id, for a new workout started from the movements selected on the Movements page. */
+/**
+ * Movements by id, for a new workout started from the movements selected on the Movements page. Archived ones are left
+ * out: a new workout is built from the library, which does not list them.
+ */
 export const getMovementsByIdServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
   .inputValidator(z.object({ ids: z.array(z.string()).max(maxExercisesPerPreset) }))
   .handler(async ({ context, data }: { context: { user: { id: string } }; data: { ids: string[] } }) => {
     const prisma = await getServerSidePrismaClient();
     const movements = await prisma.movement.findMany({
-      where: { id: { in: data.ids }, ...visibleMovements(context.user.id) },
+      where: { id: { in: data.ids }, ...pickableMovements(context.user.id) },
       select: movementFields,
     });
     // In the order asked for.

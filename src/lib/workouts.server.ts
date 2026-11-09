@@ -53,6 +53,15 @@ function findActiveWorkout(prisma: DbClient, userId: string) {
 
 type ActiveWorkout = NonNullable<Awaited<ReturnType<typeof findActiveWorkout>>>;
 
+/** Whether a movement is already in the workout: logged in it, or planned by its preset or the workout it repeats. */
+function isInWorkout(workout: ActiveWorkout, movementId: string) {
+  return (
+    workout.sets.some((set) => set.movementId === movementId) ||
+    !!workout.preset?.exercises.some((exercise) => exercise.movement.id === movementId) ||
+    !!workout.sourceWorkout?.sets.some((set) => set.movementId === movementId)
+  );
+}
+
 /**
  * One planned set of the checklist, whichever way the workout was planned. A preset's weight is optional and it carries
  * the rest to take after the set. A repeated workout's sets always have a weight and use the rest the user has set.
@@ -223,9 +232,14 @@ export const addSetServerFn = createServerFn({ method: "POST" })
       }
       const movement = await prisma.movement.findFirst({
         where: { id: data.movementId, ...visibleMovements(context.user.id) },
-        select: { id: true },
+        select: { id: true, archivedAt: true },
       });
       if (!movement) {
+        return { success: false as const, error: "Movement not found" };
+      }
+      // An archived movement cannot be picked for a new place, but a workout that already has it (a set of it, or a
+      // planned set from its preset or the workout it repeats) can keep logging it, so such a workout still finishes.
+      if (movement.archivedAt && !isInWorkout(workout, movement.id)) {
         return { success: false as const, error: "Movement not found" };
       }
       const set = await prisma.set.create({
@@ -349,7 +363,7 @@ export const getHistoryMovementsServerFn = createServerFn()
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
     // A built-in is shared, so its sets are filtered by the workout's owner too: another user's sets on the same
-    // built-in must not put it in this user's table.
+    // built-in must not put it in this user's table. An archived movement stays: its sets are in the history.
     const movements = await prisma.movement.findMany({
       where: {
         ...visibleMovements(context.user.id),
