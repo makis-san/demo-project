@@ -41,8 +41,9 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    # The suite runs on one worker and takes about 19 minutes, so 20 left no room for a slower runner.
-    timeout-minutes: 30
+    # The suite runs on one worker. With 294 tests it takes about 26 minutes plus setup, and a run was cancelled at 30
+    # on its last test. 45 leaves room for a slower runner and for the suite to grow.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine

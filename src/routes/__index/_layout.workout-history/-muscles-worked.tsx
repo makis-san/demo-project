@@ -23,14 +23,14 @@ export function MusclesWorked({ timeZone }: { timeZone: string }) {
   return (
     <Card className="enter enter-1 p-3 sm:p-5">
       <div className="space-y-1 px-2 pt-2 pb-4 sm:px-0 sm:pt-0">
-        <p className="eyebrow">
+        <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Muscles worked</h2>
+        <p className="num text-sm text-muted">
           Last 7 days · {formatDay(data.from)} to {formatDay(data.today)}
         </p>
-        <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Muscles worked</h2>
       </div>
       {data.totalSets === 0 ? (
         <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
-          No completed workouts in the last 7 days. Finish one and the muscles it trained show up here.
+          No completed workouts in the last 7 days.
         </p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:items-center">

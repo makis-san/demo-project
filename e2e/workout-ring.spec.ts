@@ -230,7 +230,7 @@ test.describe("Workout ring", () => {
   }) => {
     await startPlanned(page);
     const nextSet = page.getByRole("button", { name: /^Next set: / });
-    await expect(nextSet).toHaveAccessibleName("Next set: 10 × no weight");
+    await expect(nextSet).toHaveAccessibleName("Next set: 10 reps");
 
     for (let n = 1; n <= 3; n++) {
       await nextSet.click();
@@ -246,7 +246,7 @@ test.describe("Workout ring", () => {
     await upNext.click();
     await expect(ringMovement(page)).toHaveText("Overhead Press");
     await expect(setRows(page)).toHaveCount(3);
-    await expect(page.getByRole("button", { name: /^Next set: / })).toHaveAccessibleName("Next set: 10 × no weight");
+    await expect(page.getByRole("button", { name: /^Next set: / })).toHaveAccessibleName("Next set: 10 reps");
   });
 
   test("should move on to the next movement when the rest after its last planned set runs out", async ({ page }) => {
@@ -405,6 +405,45 @@ test.describe("Workout ring", () => {
     await add.click();
     await expect(page.getByRole("dialog", { name: "Choose a movement" })).toBeVisible();
   });
+
+  test("should start the form from the plan's next set after Add, and clear the reps after the last one", async ({
+    page,
+  }) => {
+    await startPlanned(page);
+    const reps = page.getByLabel("Reps", { exact: true });
+    const logged = page.getByRole("region", { name: "Planned sets" }).getByText("Logged", { exact: true });
+    await expect(reps).toHaveValue("10");
+    await page.getByLabel("Weight", { exact: true }).fill("100");
+
+    for (const done of [1, 2]) {
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await expect(logged).toHaveCount(done);
+      // The plan has a next set of this movement: the form is ready for it, and the weight stays.
+      await expect(reps).toHaveValue("10");
+      await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("100");
+      await expect(page.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
+    }
+    // The third was the last planned set of Bench Press: nothing is planned after it, so the reps are cleared.
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(logged).toHaveCount(3);
+    await expect(reps).toHaveValue("");
+    await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("100");
+  });
+
+  test("should say '10 reps' for a planned set with no weight, and show what was logged once it is done", async ({
+    page,
+  }) => {
+    await startPlanned(page);
+    const first = page.getByRole("list", { name: "Planned Bench Press sets" }).getByRole("listitem").first();
+    await expect(first).toContainText("10 reps");
+    await expect(first).not.toContainText("no weight");
+    await expect(page.getByRole("button", { name: /^Next set: / })).toHaveAccessibleName("Next set: 10 reps");
+
+    await page.getByLabel("Weight", { exact: true }).fill("236.8");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(first).toContainText("Logged");
+    await expect(first).toContainText("10 reps × 236.8 lbs");
+  });
 });
 
 test.describe("Workout ring on a phone", () => {
@@ -413,12 +452,7 @@ test.describe("Workout ring on a phone", () => {
   test("should fit the controls in the window", async ({ page }) => {
     await startPlanned(page);
     await expect(ring(page)).toBeVisible();
-    for (const name of [
-      "Next set: 10 × no weight",
-      "Next movement: Overhead Press",
-      "Pause workout",
-      "Finish Workout",
-    ]) {
+    for (const name of ["Next set: 10 reps", "Next movement: Overhead Press", "Pause workout", "Finish Workout"]) {
       const box = await page.getByRole("button", { name }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -446,10 +480,14 @@ test.describe("Workout ring on a phone", () => {
 
     await ringTab.click();
     await expect(ringTab).toHaveAttribute("aria-selected", "true");
+    // The set just logged started the rest, and on a phone its countdown takes the middle of the ring. Skipped, the clock is back.
+    await page.getByRole("button", { name: "Skip" }).click();
     await expect(clock(page)).toBeInViewport();
   });
 
-  test("should slide back to the set form when a planned set is adjusted from the list", async ({ page }) => {
+  test("should adjust a planned set from the list with the set bar still there, and the numbers filled in", async ({
+    page,
+  }) => {
     await startPlanned(page);
     await page.getByRole("tab", { name: /^List/ }).click();
     await page
@@ -457,8 +495,62 @@ test.describe("Workout ring on a phone", () => {
       .first()
       .click();
 
-    await expect(page.getByRole("tab", { name: "Ring" })).toHaveAttribute("aria-selected", "true");
+    // The set bar is at the bottom of both panes, so there is nowhere to slide to: the List stays, and the bar has the
+    // movement and the planned set's numbers.
+    await expect(page.getByRole("tab", { name: /^List/ })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("group", { name: "Selected movement" })).toContainText("Overhead Press");
     await expect(page.getByLabel("Reps", { exact: true })).toBeInViewport();
+    await expect(page.getByLabel("Reps", { exact: true })).not.toHaveValue("");
+  });
+
+  test("should show the ring's movement in the set bar with its numbers, also after a reload", async ({ page }) => {
+    await startPlanned(page);
+    const bar = page.getByRole("group", { name: "Selected movement" });
+    await expect(bar).toContainText("Bench Press");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("10");
+    await expect(page.getByRole("button", { name: "Add movement", exact: true })).toHaveCount(0);
+
+    await page.reload();
+    await expect(bar).toContainText("Bench Press");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("10");
+    // No scrolling on the Ring pane: the ring, its controls and the bar are all on the first screen.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+  });
+
+  test("should show the rest countdown big in the middle of the ring, and the clock again when it is skipped", async ({
+    page,
+  }) => {
+    await startPlanned(page);
+    const ringBox = () => ring(page).locator(".aspect-square").boundingBox();
+    const before = (await ringBox())!;
+    await page.getByRole("button", { name: /^Next set/ }).click();
+
+    // No floating pill on a phone: the rest's controls take the place of Next set and Pause, and the ring keeps its size.
+    await expect(page.getByText("Resting")).toBeHidden();
+    for (const name of ["−15s", "+15s", "Skip"]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+    }
+    await expect(page.getByRole("button", { name: /^Next set/ })).toHaveCount(0);
+    expect((await ringBox())!.width).toBe(before.width);
+
+    // In the middle of the ring, as large as the clock was: readable from where the phone is propped.
+    const label = page.getByRole("region", { name: "Workout progress" }).getByText("Rest", { exact: true });
+    await expect(label).toBeVisible();
+    const countdown = label.locator("xpath=following-sibling::p");
+    await expect(countdown).toHaveText(/^[01]:\d\d$/);
+    const size = await countdown.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const nameSize = await ring(page)
+      .getByTestId("ring-movement")
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(size).toBeGreaterThanOrEqual(30);
+    expect(size).toBeGreaterThan(nameSize * 2.5);
+    // The workout clock stays in the top bar.
+    await expect(clock(page)).toBeHidden();
+
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(label).toHaveCount(0);
+    await expect(clock(page)).toBeVisible();
   });
 });

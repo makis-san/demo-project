@@ -1,4 +1,3 @@
-import { weightUnit } from "@/lib/units";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatDate, formatTime, fullDate, shortDate } from "@/lib/dates";
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { completeWorkoutServerFn, addSetServerFn, deleteSetServerFn } from "@/lib/workouts.server";
 import { Library, Play, Plus } from "lucide-react";
+import { useIsPhone } from "@/lib/use-media-query";
 import { buttonClasses } from "@/components/ui/button";
 import { WorkoutCard } from "@/components/workout-card";
 import { presetsQueryKey, todayQueryOptions } from "../_layout.workout-library/-queries/presets";
@@ -26,6 +26,9 @@ import { buzz } from "@/lib/use-now";
 import {
   personalRecords,
   plannedProgress,
+  PhoneComposer,
+  PhoneTopBar,
+  plannedText,
   PlannedSets,
   RecapCard,
   RecentMovements,
@@ -37,7 +40,14 @@ import {
   type PlannedSet,
   type Recap,
 } from "./-workout-parts";
-import { loggedCounts, movementColors, plannedGroups, WorkoutRing } from "./-workout-ring";
+import {
+  loggedCounts,
+  movementColors,
+  plannedGroups,
+  SessionNumbers,
+  TimelineLegend,
+  WorkoutRing,
+} from "./-workout-ring";
 import { SwipePanes } from "@/components/swipe-panes";
 import { useWorkoutTimeline } from "./-use-timeline";
 import { currentSection, elapsedMs, isPaused, pause, resume, switchTo } from "@/lib/workout-timeline";
@@ -72,8 +82,13 @@ function CurrentWorkoutPage() {
   const [confettiKey, setConfettiKey] = useState(0);
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
-  // True while the weight field holds the body weight we filled in, not something the user typed.
-  const [weightIsBodyWeight, setWeightIsBodyWeight] = useState(false);
+  // The movement whose weight and reps have been filled in. Until then the last top set from the history, which comes
+  // from a request, still fills in whatever is empty when it arrives.
+  const prefilled = useRef<string | null>(null);
+  // Below md the set form is a bar at the bottom of the screen. Its height, so the page leaves room and the rest timer
+  // floats above it. Null until it is measured.
+  const phone = useIsPhone();
+  const [composerHeight, setComposerHeight] = useState<number | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
   // The session's numbers, taken when Finish is pressed, for the recap once the server agrees.
   const pendingRecap = useRef<Recap | null>(null);
@@ -131,10 +146,23 @@ function CurrentWorkoutPage() {
   const history = new Map<string, MovementHistory>();
   for (const id of historyIds) {
     const best = bests?.find((b) => b.movementId === id);
-    if (best) history.set(id, { lastTop: best.lastTop, lastDay: best.lastDay, best: best.best });
+    if (best)
+      history.set(id, { lastTop: best.lastTop, lastTopReps: best.lastTopReps, lastDay: best.lastDay, best: best.best });
     else if (bests && !isPlaceholderData) history.set(id, null);
   }
   const prs = personalRecords(sets, history);
+
+  // The last top set of a movement with no set in this session, no plan and no body weight to start from: it fills in
+  // what is still empty once the history answers. A movement never trained has nothing to fill in.
+  const selectedHistory =
+    selectedMovement && history.has(selectedMovement) ? history.get(selectedMovement)! : undefined;
+  useEffect(() => {
+    if (!selected || prefilled.current === selected.id || selectedHistory === undefined) return;
+    prefilled.current = selected.id;
+    if (!selectedHistory) return;
+    setWeight((current) => (current === "" ? String(selectedHistory.lastTop) : current));
+    setReps((current) => (current === "" ? String(selectedHistory.lastTopReps) : current));
+  }, [selected, selectedHistory]);
 
   const needsBodyWeight = !!selected?.isBodyWeight && latestBodyWeight === null;
 
@@ -143,25 +171,67 @@ function CurrentWorkoutPage() {
   const showPane = useRef<((index: number) => void) | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const revealComposer = () => {
+    // On a phone the form is a bar at the bottom of both panes: there is nothing to scroll to.
+    if (phone) return;
     showPane.current?.(0);
     window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 380);
   };
 
-  const handleMovementChange = (movement: MovementOption, { reveal = true, resumes = false } = {}) => {
+  /**
+   * Picks the movement for the next set and fills in weight and reps, so a set is often one tap away. From the first
+   * that applies: this session's last set of it, the plan's next set of it, a body-weight movement's weight from the
+   * latest body weight, and the last top set from earlier workouts (that one arrives later, see the effect below).
+   * Picking a different movement replaces what was typed; picking the same one again only fills what is empty.
+   */
+  const applySelection = (movement: MovementOption) => {
+    const same = selected?.id === movement.id;
+    const own = (set: { movement: { id: string } }) => set.movement.id === movement.id;
+    const last = [...sets].reverse().find(own);
+    const planned = last ? undefined : workout?.plan?.sets.filter(own)[sets.filter(own).length];
+    const planWeight = workout?.plan?.sets.filter(own)[sets.filter(own).length]?.weight;
+    // A body-weight movement starts from the latest body weight (the added weight is typed on top), unless the plan has
+    // a weight for it. Any other movement starts from this session's last set, then the plan's.
+    const bodyWeightStart = movement.isBodyWeight && latestBodyWeight !== null ? String(latestBodyWeight) : null;
+    const nextWeight =
+      bodyWeightStart !== null
+        ? planWeight != null
+          ? String(planWeight)
+          : bodyWeightStart
+        : last
+          ? String(last.weight)
+          : planWeight != null
+            ? String(planWeight)
+            : "";
+    const nextReps = last ? String(last.reps) : planned ? String(planned.reps) : "";
+    const finalWeight = same && weight !== "" ? weight : nextWeight;
+    setWeight(finalWeight);
+    setReps(same && reps !== "" ? reps : nextReps);
+    prefilled.current = finalWeight !== "" ? movement.id : null;
     setSelected(movement);
+  };
+  const handleMovementChange = (movement: MovementOption, { reveal = true, resumes = false } = {}) => {
+    applySelection(movement);
     moveTo(movement.id, { resumes });
     if (reveal) revealComposer();
-    if (movement.isBodyWeight && latestBodyWeight !== null) {
-      // Keep a weight the user typed, for example the added weight on dips.
-      if (weight === "" || weightIsBodyWeight) {
-        setWeight(String(latestBodyWeight));
-        setWeightIsBodyWeight(true);
-      }
-    } else if (weightIsBodyWeight) {
-      setWeight("");
-      setWeightIsBodyWeight(false);
-    }
   };
+
+  // The movement the ring is on is the one the set bar is for. The page starts with nothing picked (after a reload, or
+  // when a preset's workout has just begun), so the ring's movement is picked for it, with its numbers filled in.
+  // Only a workout with nothing to log yet (the ring on its warm-up) leaves the bar as "Add movement".
+  const ringMovementId = timeline.timeline ? currentSection(timeline.timeline).movementId : null;
+  const ringMovement =
+    ringMovementId === null
+      ? undefined
+      : [...(workout?.plan?.sets ?? []), ...sets].find((set) => set.movement.id === ringMovementId)?.movement;
+  // A new workout starts with nothing picked.
+  useEffect(() => {
+    setSelected(null);
+    prefilled.current = null;
+  }, [workout?.id]);
+  useEffect(() => {
+    if (selected === null && ringMovement) applySelection(ringMovement);
+    // Only while nothing is picked: a pick of its own is applied to the ring in the same go.
+  }, [selected, ringMovement?.id]);
 
   // A server function refuses when the page is out of date, for example when another tab already completed the
   // workout or removed the set. Reload the workout when an action fails too, so the page shows what the server has.
@@ -197,12 +267,15 @@ function CurrentWorkoutPage() {
     mutationFn: async ({
       fromForm: _fromForm,
       restSeconds: _restSeconds,
+      next: _next,
       ...data
     }: {
       movementId: string;
       reps: number;
       weight: number;
       fromForm: boolean;
+      /** The plan's next set of this movement, if it has one: the form starts from it for the next set. */
+      next?: { reps: number; weight: number | null } | null;
       /** The rest a preset asks for after this set. Used by the rest timer only, never sent to the server. */
       restSeconds?: number | null;
     }) => {
@@ -211,8 +284,13 @@ function CurrentWorkoutPage() {
       return result;
     },
     onMutate: ({ movementId }) => moveTo(movementId, { resumes: true }),
-    onSuccess: (_result, { fromForm, restSeconds }) => {
-      if (fromForm) setReps("");
+    onSuccess: (_result, { fromForm, restSeconds, next }) => {
+      if (fromForm) {
+        // The next planned set of this movement, if the plan has one, is what the form shows for the next set. Without
+        // one the reps are cleared for the user to type, and the weight stays, as the next set is often the same.
+        setReps(next ? String(next.reps) : "");
+        if (next?.weight != null) setWeight(String(next.weight));
+      }
       buzz(12);
       timer.start(restSeconds ?? undefined);
     },
@@ -241,16 +319,16 @@ function CurrentWorkoutPage() {
     onSettled: refreshWorkout,
   });
 
-  // A chip from this session picks the movement and its last set, so the next set starts from there.
+  // A chip from this session, or Adjust on a planned set, picks the movement and that set's numbers.
   const pickRecent = (set: Pick<LoggedSet, "movement" | "reps"> & { weight: number | null }) => {
     setSelected(set.movement);
     moveTo(set.movement.id);
     revealComposer();
-    // A planned set may have no weight: leave it for the user, or start a body-weight movement from their body weight.
-    const bodyWeight = set.weight === null && set.movement.isBodyWeight && latestBodyWeight !== null;
-    setWeight(set.weight !== null ? String(set.weight) : bodyWeight ? String(latestBodyWeight) : "");
-    setWeightIsBodyWeight(bodyWeight);
+    // A planned set may have no weight: start a body-weight movement from their body weight, or leave it for the user.
+    const start = set.weight ?? (set.movement.isBodyWeight && latestBodyWeight !== null ? latestBodyWeight : null);
+    setWeight(start !== null ? String(start) : "");
     setReps(String(set.reps));
+    prefilled.current = start !== null ? set.movement.id : null;
   };
 
   const completeWorkout = () => {
@@ -278,6 +356,9 @@ function CurrentWorkoutPage() {
       reps: parseInt(reps),
       weight: parseFloat(weight),
       fromForm: true,
+      next: workout?.plan?.sets.filter((set) => set.movement.id === selectedMovement)[
+        sets.filter((set) => set.movement.id === selectedMovement).length + 1
+      ],
     });
   };
 
@@ -287,7 +368,7 @@ function CurrentWorkoutPage() {
     return (
       <div className="space-y-6">
         {confetti}
-        <PageHeader eyebrow="Today" title="Current Workout" />
+        <PageHeader title="Current Workout" />
         {recap && <RecapCard recap={recap} onDismiss={() => setRecap(null)} />}
         <Card className="enter enter-1 overflow-hidden">
           <div className="relative flex flex-col items-start gap-6 p-7 sm:p-10">
@@ -299,9 +380,6 @@ function CurrentWorkoutPage() {
             <div className="space-y-2">
               <p className="text-2xl font-semibold tracking-tight font-stretch-[112%] text-chalk sm:text-3xl">
                 No active workout. Ready to start?
-              </p>
-              <p className="max-w-md text-sm text-muted">
-                Pick a workout and look at what is in it. Nothing starts, and no clock runs, until you press Start.
               </p>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -321,7 +399,7 @@ function CurrentWorkoutPage() {
         </Card>
         {today.workouts.length > 0 && (
           <section className="enter enter-2 space-y-3" aria-label="Workout of the day">
-            <h2 className="eyebrow px-1">Workout of the day</h2>
+            <h2 className="px-1 text-base font-semibold text-chalk">Workout of the day</h2>
             {today.workouts.map((workout) => (
               <WorkoutCard key={workout.id} workout={workout} />
             ))}
@@ -355,7 +433,8 @@ function CurrentWorkoutPage() {
     setEnded(true);
   };
   const goNext = () => {
-    if (nextGroup) handleMovementChange(nextGroup.movement, { reveal: false }); else if (groups.length > 0) endPlan();
+    if (nextGroup) handleMovementChange(nextGroup.movement, { reveal: false });
+    else if (groups.length > 0) endPlan();
     else setChoosing(true);
   };
   const names = new Map<string, string>();
@@ -370,8 +449,7 @@ function CurrentWorkoutPage() {
   const done = workout.plan ? plannedProgress(workout.plan.sets, sets) : new Set<string>();
   const nextPlanned = workout.plan?.sets.find((set) => set.movement.id === currentId && !done.has(set.id));
   const lastOfCurrent = [...sets].reverse().find((set) => set.movement.id === currentId);
-  const setText = (set: { reps: number; weight: number | null }) =>
-    `${set.reps} × ${set.weight === null ? "no weight" : `${set.weight} ${weightUnit}`}`;
+  const setText = plannedText;
   const movesOn = groups.some((g) => g.movement.id === currentId) && !nextPlanned;
   const nextSetDetail = !currentId
     ? "Pick a movement"
@@ -403,17 +481,51 @@ function CurrentWorkoutPage() {
     (ended || (planDone && groups.some((g) => g.movement.id === currentId)));
 
   const lastOfSelected = recent.find((r) => r.movement.id === selectedMovement)?.last;
-  const selectedHistory = selectedMovement
-    ? history.has(selectedMovement)
-      ? history.get(selectedMovement)!
-      : undefined
-    : undefined;
+
+  // What the set form needs, for the one in the page (md and up) and the bar on a phone.
+  const composerProps = {
+    weight,
+    onWeightChange: setWeight,
+    reps,
+    onRepsChange: setReps,
+    onSubmit: handleAddSet,
+    isPending: addSetMutation.isPending,
+    needsBodyWeight: needsBodyWeight && (
+      <p className="px-1 text-sm text-muted">
+        No body weight recorded yet. Enter a weight, or{" "}
+        <Link to="/body-weight" className="text-accent underline-offset-4 hover:underline">
+          log your body weight
+        </Link>{" "}
+        to have it filled in.
+      </p>
+    ),
+    history: selectedHistory,
+    startWeight: lastOfSelected?.weight ?? selectedHistory?.lastTop,
+    startReps: lastOfSelected?.reps ?? selectedHistory?.lastTopReps,
+    nextSetNumber: sets.filter((set) => set.movement.id === selectedMovement).length + 1,
+    timer,
+  };
 
   return (
-    <div className={timer.rest ? "space-y-6 pb-24 md:pb-0" : "space-y-6"}>
+    <div
+      className="space-y-6 max-md:space-y-4 max-md:pb-[calc(var(--composer-h,4.5rem)+0.5rem)]"
+      style={
+        {
+          ...(composerHeight ? { "--composer-h": `${composerHeight}px` } : {}),
+        } as React.CSSProperties
+      }>
       {confetti}
+      <PhoneTopBar
+        timeline={timeline.timeline}
+        startedAt={workout.startedAt}
+        onFinish={completeWorkout}
+        finishing={completeWorkoutMutation.isPending}
+        showFinish={!complete}
+      />
+      {/* On a phone the top bar stands in for the header: the h1 stays for screen readers. */}
       <PageHeader
-        eyebrow={`In progress · started ${formatTime(workout.startedAt, timeZone)}`}
+        className="max-md:sr-only"
+        context={`In progress · started ${formatTime(workout.startedAt, timeZone)}`}
         title="Current Workout"
         nowrap
         actions={
@@ -423,7 +535,7 @@ function CurrentWorkoutPage() {
             aria-label="Add movement"
             title="Add movement"
             onClick={() => setChoosing(true)}
-            className="group h-11 w-11 shrink-0">
+            className="group h-11 w-11 shrink-0 max-md:hidden">
             <Plus className="h-5 w-5 transition-transform duration-300 ease-out group-hover:rotate-90 group-active:scale-75" />
           </Button>
         }
@@ -438,7 +550,8 @@ function CurrentWorkoutPage() {
             id: "ring",
             label: "Ring",
             content: (
-              <div className="space-y-4">
+              // On a phone the ring and its controls are centred in what the top bar, the tabs and the set bar leave.
+              <div className="space-y-4 max-md:flex max-md:min-h-[calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-pane-top,10rem))] max-md:flex-col max-md:justify-center">
                 <WorkoutRing
                   timeline={timeline.timeline}
                   title={formatDate(workout.startedAt, timeZone, fullDate)}
@@ -458,41 +571,17 @@ function CurrentWorkoutPage() {
                   onFinish={completeWorkout}
                   finishing={completeWorkoutMutation.isPending}
                   complete={complete}
+                  rest={phone ? timer.rest : null}
+                  onRestAdjust={timer.adjust}
+                  onRestStop={timer.stop}
                   onAdd={() => {
                     setExtending(true);
                     setChoosing(true);
                   }}
                 />
-                {selected && (
+                {selected && !phone && (
                   <div ref={composerRef} className="scroll-mb-28">
-                    <SetComposer
-                      selectedMovement={selected}
-                      weight={weight}
-                      onWeightChange={(value) => {
-                        setWeight(value);
-                        setWeightIsBodyWeight(false);
-                      }}
-                      reps={reps}
-                      onRepsChange={setReps}
-                      onSubmit={handleAddSet}
-                      isPending={addSetMutation.isPending}
-                      needsBodyWeight={
-                        needsBodyWeight && (
-                          <p className="px-2 text-sm text-muted">
-                            No body weight recorded yet. Enter a weight, or{" "}
-                            <Link to="/body-weight" className="text-accent underline-offset-4 hover:underline">
-                              log your body weight
-                            </Link>{" "}
-                            to have it filled in.
-                          </p>
-                        )
-                      }
-                      history={selectedHistory}
-                      startWeight={lastOfSelected?.weight ?? selectedHistory?.lastTop}
-                      startReps={lastOfSelected?.reps}
-                      nextSetNumber={sets.filter((set) => set.movement.id === selectedMovement).length + 1}
-                      timer={timer}
-                    />
+                    <SetComposer {...composerProps} selectedMovement={selected} />
                   </div>
                 )}
               </div>
@@ -510,6 +599,18 @@ function CurrentWorkoutPage() {
             ),
             content: (
               <div className="space-y-6">
+                {/* The ring's legend and numbers, for a phone: the ring has the whole screen there. */}
+                <div className="space-y-3 md:hidden">
+                  <SessionNumbers sets={sets} />
+                  <TimelineLegend
+                    timeline={timeline.timeline}
+                    plan={workout.plan?.sets ?? null}
+                    sets={sets}
+                    names={names}
+                    colors={colors}
+                    defaultRestSeconds={timer.seconds}
+                  />
+                </div>
                 {recent.length > 0 && <RecentMovements recent={recent} selectedId={selected?.id} onPick={pickRecent} />}
                 {workout.plan && workout.plan.sets.length > 0 && (
                   <PlannedSets
@@ -548,6 +649,15 @@ function CurrentWorkoutPage() {
           },
         ]}
       />
+
+      {/* The set form on a phone: a bar at the bottom, in both panes. The plan's end has Finish and Add on the ring. */}
+      {(!selected || phone) && !complete && (
+        <PhoneComposer
+          composer={selected ? { ...composerProps, selectedMovement: selected } : null}
+          onChoose={() => setChoosing(true)}
+          onHeight={(px) => setComposerHeight(px || null)}
+        />
+      )}
 
       {choosing && (
         <MovementBrowser

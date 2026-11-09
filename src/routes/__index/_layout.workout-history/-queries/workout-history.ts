@@ -1,4 +1,9 @@
-import { getHistoryMovementsServerFn, getWorkoutHistoryServerFn, type HistoryCursor } from "@/lib/workouts.server";
+import {
+  getHistoryMovementsServerFn,
+  getLastWorkoutServerFn,
+  getWorkoutHistoryServerFn,
+  type HistoryCursor,
+} from "@/lib/workouts.server";
 import {
   getMovementBestsServerFn,
   getMuscleLoadServerFn,
@@ -60,4 +65,12 @@ export const muscleLoadQueryOptions = (timeZone: string) =>
   queryOptions({
     queryKey: [...workoutHistoryQueryKey, "muscles", timeZone],
     queryFn: () => getMuscleLoadServerFn(),
+  });
+
+// The latest completed workout, for the home screen. Under the history key, so completing or deleting a workout
+// refreshes it with the list.
+export const lastWorkoutQueryOptions = () =>
+  queryOptions({
+    queryKey: [...workoutHistoryQueryKey, "last"],
+    queryFn: () => getLastWorkoutServerFn(),
   });

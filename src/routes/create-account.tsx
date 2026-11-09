@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createAccountServerFn } from "@/lib/auth.server";
 import { errorMessage } from "@/lib/error-message";
+import { minPasswordLength } from "@/lib/validation";
 
 export const Route = createFileRoute("/create-account")({
   beforeLoad: ({ context }) => {
@@ -44,7 +45,7 @@ function CreateAccountPage() {
   };
 
   return (
-    <AuthShell title="Create your account" subtitle="Set up your log, then add the movements you train.">
+    <AuthShell title="Create account">
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && <FormError>{error}</FormError>}
         <div className="space-y-2">
@@ -80,11 +81,11 @@ function CreateAccountPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={minPasswordLength}
             maxLength={128}
             autoComplete="new-password"
           />
-          <p className="text-xs text-faint">Must be at least 6 characters</p>
+          <p className="text-xs text-faint">Must be at least {minPasswordLength} characters</p>
         </div>
         <Button type="submit" className="h-12 w-full" disabled={isLoading}>
           {isLoading ? "Creating account..." : "Create account"}

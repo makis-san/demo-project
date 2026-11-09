@@ -58,7 +58,7 @@ function MovementPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={movement.isBuiltIn ? "Movement" : "Your movement"}
+        context={movement.isBuiltIn ? undefined : "Your movement"}
         title={movement.name}
         actions={
           <Link
@@ -84,11 +84,8 @@ function MovementPage() {
             </Card>
           ) : (
             <Card className="enter enter-1 p-5 sm:p-7">
-              <p className="eyebrow">Animation</p>
-              <p className="mt-2 text-sm text-muted">
-                {movement.guide
-                  ? "There is no animation for this movement yet. The muscles and the steps are on the right."
-                  : "This is a movement you created, so there is no guide for it. Its muscles are on the right."}
+              <p className="text-sm text-muted">
+                {movement.guide ? "No animation for this movement yet." : "No guide for a movement you created."}
               </p>
             </Card>
           )}
@@ -113,7 +110,7 @@ function MovementPage() {
           {movement.guide && (
             <>
               <div>
-                <h2 className="eyebrow mb-2">How to do it</h2>
+                <h2 className="mb-2 text-base font-semibold text-chalk">How to do it</h2>
                 <ol className="grid gap-1.5">
                   {movement.guide.steps.map((text, i) => (
                     <li
@@ -195,7 +192,7 @@ function DeleteMovement({
 
   return (
     <Card className="enter enter-3 space-y-3 p-4 sm:p-5">
-      <h2 className="eyebrow">Remove from your library</h2>
+      <h2 className="text-base font-semibold text-chalk">Remove from your library</h2>
       {archived ? (
         <p className="text-sm text-muted">
           This movement is archived. It is hidden from the library and the pickers, and your history keeps it. Create a
@@ -255,7 +252,7 @@ function MuscleList({
 }) {
   return (
     <div>
-      <h2 className="eyebrow mb-2">{title}</h2>
+      <h2 className="mb-2 text-sm font-semibold text-muted">{title}</h2>
       {muscles.length === 0 ? (
         <p className="text-xs text-faint">None</p>
       ) : (
@@ -286,7 +283,7 @@ function YourNumbers({ movementId, timeZone }: { movementId: string; timeZone: s
 
   return (
     <Card className="enter enter-3 p-5 sm:p-7">
-      <p className="eyebrow">Your numbers</p>
+      <h2 className="text-base font-semibold text-chalk">Your numbers</h2>
       {!data ? (
         <p className="mt-2 min-h-5 text-sm text-faint"> </p>
       ) : !last ? (
@@ -294,14 +291,14 @@ function YourNumbers({ movementId, timeZone }: { movementId: string; timeZone: s
       ) : (
         <dl className="num mt-3 grid grid-cols-2 gap-4">
           <div>
-            <dt className="eyebrow">Last top set</dt>
+            <dt className="text-[13px] text-muted">Last top set</dt>
             <dd className="mt-1 text-2xl font-bold tracking-tight text-chalk font-stretch-[88%]">
               {numberFormat.format(last.maxWeight)} <span className="text-sm font-medium text-muted">{weightUnit}</span>
             </dd>
             <dd className="text-xs text-faint">{formatDate(`${last.day}T12:00:00Z`, "UTC", shortDate)}</dd>
           </div>
           <div>
-            <dt className="eyebrow">Best</dt>
+            <dt className="text-[13px] text-muted">Best</dt>
             <dd className="mt-1 text-2xl font-bold tracking-tight text-chalk font-stretch-[88%]">
               {numberFormat.format(best!)} <span className="text-sm font-medium text-muted">{weightUnit}</span>
             </dd>

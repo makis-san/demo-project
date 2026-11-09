@@ -332,7 +332,7 @@ test.describe("Workout library", () => {
       await expect(page.getByText(/^1:(30|29|28)$/).first()).toBeVisible();
 
       // A planned set with no weight can be adjusted first: the weight is left for the user to type.
-      await page.getByRole("button", { name: "Adjust planned Bench Press set: 10 × no weight" }).first().click();
+      await page.getByRole("button", { name: "Adjust planned Bench Press set: 10 reps" }).first().click();
       await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("");
       await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("10");
       await page.getByLabel("Weight", { exact: true }).fill("80");
@@ -341,7 +341,7 @@ test.describe("Workout library", () => {
       await expect(page.getByText("2 of 3 logged", { exact: true })).toBeVisible();
 
       // Or logged as it is: with no weight it is logged with 0.
-      await page.getByRole("button", { name: "Log planned Bench Press set: 10 × no weight" }).click();
+      await page.getByRole("button", { name: "Log planned Bench Press set: 10 reps" }).click();
       await expect(setRows(page)).toHaveCount(3);
       await expect(page.getByText("3 of 3 logged", { exact: true })).toBeVisible();
     });
@@ -352,7 +352,7 @@ test.describe("Workout library", () => {
       await page.getByRole("link", { name: "Start Pull day" }).click();
       await pressStart(page);
 
-      await page.getByRole("button", { name: "Log planned Pull-Up set: 10 × no weight" }).first().click();
+      await page.getByRole("button", { name: "Log planned Pull-Up set: 10 reps" }).first().click();
       await expect(setRows(page)).toContainText("10 reps × 181 lbs");
     });
 
@@ -360,7 +360,7 @@ test.describe("Workout library", () => {
       await createWorkout(page, "Legs", ["Back Squat"]);
       await page.getByRole("link", { name: "Start Legs" }).click();
       await pressStart(page);
-      await page.getByRole("button", { name: "Log planned Back Squat set: 10 × no weight" }).first().click();
+      await page.getByRole("button", { name: "Log planned Back Squat set: 10 reps" }).first().click();
       await expect(page.getByText("1 of 3 logged", { exact: true })).toBeVisible();
       await page.reload();
       // Wait for React to take over, or the next click can land on the server's HTML and do nothing.
@@ -421,8 +421,8 @@ test.describe("Workout library on a phone", () => {
     await noSideways();
     await goTo(page, "Home");
     await noSideways();
-    // Every item of the six-tab dock is on the screen and tappable.
-    for (const label of ["Home", "Current Workout", "Workout Library", "Workout History", "Movements", "Body Weight"]) {
+    // Every item of the five-item dock is on the screen and tappable.
+    for (const label of ["Home", "Library", "Current Workout", "Workout History", "Body Weight"]) {
       const box = await page.getByRole("link", { name: label, exact: true }).boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(390);

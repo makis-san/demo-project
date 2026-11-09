@@ -92,6 +92,8 @@ export type MovementBest = {
   movementId: string;
   /** The heaviest weight of the movement's most recent day. */
   lastTop: number;
+  /** The reps of that top set, to start the next one from. */
+  lastTopReps: number;
   /** That day in the user's timezone, as YYYY-MM-DD. */
   lastDay: string;
   /** The heaviest weight ever lifted for the movement. */
@@ -128,7 +130,8 @@ export const getMovementBestsServerFn = createServerFn()
           SELECT
             s."movementId",
             (w."completedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone})::date AS "day",
-            MAX(s."weight") AS "topWeight"
+            MAX(s."weight") AS "topWeight",
+            (ARRAY_AGG(s."reps" ORDER BY s."weight" DESC, s."createdAt" DESC))[1] AS "topReps"
           FROM "Set" s
           JOIN "Workout" w ON w."id" = s."workoutId"
           WHERE w."userId" = ${context.user.id}
@@ -139,6 +142,7 @@ export const getMovementBestsServerFn = createServerFn()
         SELECT DISTINCT ON ("movementId")
           "movementId",
           "topWeight"::float8 AS "lastTop",
+          "topReps"::int AS "lastTopReps",
           to_char("day", 'YYYY-MM-DD') AS "lastDay",
           (MAX("topWeight") OVER (PARTITION BY "movementId"))::float8 AS "best"
         FROM days

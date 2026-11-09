@@ -161,7 +161,7 @@ test.describe("Movement page", () => {
   test("should show the body map and steps for a built-in without an animation", async ({ page }) => {
     await openMovement(page, "Lateral Raise");
 
-    await expect(page.getByText("There is no animation for this movement yet.")).toBeVisible();
+    await expect(page.getByText("No animation for this movement yet.")).toBeVisible();
     await expect(page.getByTestId("figure-phase")).toHaveCount(0);
     await expect(page.locator("ol > li[data-step]")).toHaveCount(3);
     await expect(page.getByRole("list", { name: "Primary muscles" })).toHaveText("Shoulders");
@@ -171,7 +171,7 @@ test.describe("Movement page", () => {
     await addMovement(page, "Home Made Lift");
     await movementRow(page, "Home Made Lift").getByRole("link").click();
 
-    await expect(page.getByText("This is a movement you created")).toBeVisible();
+    await expect(page.getByText("No guide for a movement you created.")).toBeVisible();
     await expect(page.locator("ol > li[data-step]")).toHaveCount(0);
   });
 

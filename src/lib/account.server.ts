@@ -10,6 +10,13 @@ export type DeletedCounts = {
 };
 
 /**
+ * Prisma gives an interactive transaction 5 seconds, then rolls it back. Deleting a user with 4,000 workouts and
+ * 96,000 sets took 0.2 seconds on the load seed, so the default would do today. A longer limit costs nothing, since
+ * a transaction that finishes early does not wait, and it keeps a much bigger account from failing on a slow disk.
+ */
+const defaultTimeoutMs = 30_000;
+
+/**
  * Deletes a user and everything of theirs, in one transaction: either all of it goes or none of it does.
  *
  * The foreign keys from User are RESTRICT on purpose, so a stray DELETE of a user fails instead of silently
@@ -28,22 +35,30 @@ export type DeletedCounts = {
  *
  * It takes the client so a script can pass one built from an explicit database URL, and the app can pass its own.
  * It does not check who is asking: whoever calls it must already have decided that this user may be deleted.
+ * `timeoutMs` is how long the transaction may run before it is rolled back, and is only changed by a test.
  */
-export async function deleteUserAndData(prisma: PrismaClient, userId: string): Promise<DeletedCounts> {
-  return prisma.$transaction(async (tx) => {
-    const sessions = await tx.session.deleteMany({ where: { userId } });
-    const workouts = await tx.workout.deleteMany({ where: { userId } });
-    const bodyWeights = await tx.bodyWeight.deleteMany({ where: { userId } });
-    const presets = await tx.workoutPreset.deleteMany({ where: { userId } });
-    const movements = await tx.movement.deleteMany({ where: { userId } });
-    // delete, not deleteMany: an id that does not exist throws, and the transaction rolls back.
-    await tx.user.delete({ where: { id: userId } });
-    return {
-      sessions: sessions.count,
-      workouts: workouts.count,
-      bodyWeights: bodyWeights.count,
-      presets: presets.count,
-      movements: movements.count,
-    };
-  });
+export async function deleteUserAndData(
+  prisma: PrismaClient,
+  userId: string,
+  { timeoutMs = defaultTimeoutMs }: { timeoutMs?: number } = {},
+): Promise<DeletedCounts> {
+  return prisma.$transaction(
+    async (tx) => {
+      const sessions = await tx.session.deleteMany({ where: { userId } });
+      const workouts = await tx.workout.deleteMany({ where: { userId } });
+      const bodyWeights = await tx.bodyWeight.deleteMany({ where: { userId } });
+      const presets = await tx.workoutPreset.deleteMany({ where: { userId } });
+      const movements = await tx.movement.deleteMany({ where: { userId } });
+      // delete, not deleteMany: an id that does not exist throws, and the transaction rolls back.
+      await tx.user.delete({ where: { id: userId } });
+      return {
+        sessions: sessions.count,
+        workouts: workouts.count,
+        bodyWeights: bodyWeights.count,
+        presets: presets.count,
+        movements: movements.count,
+      };
+    },
+    { timeout: timeoutMs },
+  );
 }

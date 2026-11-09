@@ -70,7 +70,7 @@ export function SwipePanes({
         ref={tabs}
         role="tablist"
         aria-label={label}
-        className="relative mb-4 grid scroll-mt-4 rounded-full bg-black/25 p-1 lg:hidden"
+        className="relative mb-4 grid scroll-mt-4 rounded-full bg-black/25 p-1 lg:hidden [@media(max-height:700px)]:mb-2"
         style={{ gridTemplateColumns: `repeat(${panes.length}, minmax(0, 1fr))` }}>
         <span
           aria-hidden="true"
@@ -90,7 +90,7 @@ export function SwipePanes({
             aria-controls={`${pane.id}-pane`}
             onClick={() => goTo(i)}
             className={cn(
-              "press relative flex h-10 items-center justify-center gap-2 rounded-full text-sm font-semibold transition-colors duration-300",
+              "press relative flex h-10 items-center justify-center gap-2 rounded-full text-sm font-semibold transition-colors duration-300 [@media(max-height:700px)]:h-8",
               Math.round(position) === i ? "text-chalk" : "text-faint hover:text-muted",
             )}>
             {pane.label}
