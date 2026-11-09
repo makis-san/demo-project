@@ -264,6 +264,12 @@ function FigureSvg({
           <circle data-eq="hub" className="fg-eq" r="2.8" cx={num(eq.plate![0])} cy={num(eq.plate![1])} />
         </>
       )}
+      {gear === "dumbbell" && (
+        <>
+          <circle data-eq="plate" className="fg-plate" r="9" cx={num(eq.plate![0])} cy={num(eq.plate![1])} />
+          <circle data-eq="hub" className="fg-eq" r="2.2" cx={num(eq.plate![0])} cy={num(eq.plate![1])} />
+        </>
+      )}
       {gear === "pullbar" && (
         <circle data-eq="bar" className="fg-eq" r="2.6" cx={num(eq.plate![0])} cy={num(eq.plate![1])} />
       )}
@@ -448,7 +454,16 @@ export function MovementFigure({
 
   const start = poseAt(figure.poses, 0);
   const j0 = joints(start, figure.root, figure.at);
-  const pathLabel = figure.path === "heel" ? "Heel path" : figure.path === "body" ? "Body path" : "Bar path";
+  const pathLabel =
+    figure.path === "heel"
+      ? "Heel path"
+      : figure.path === "body"
+        ? "Body path"
+        : figure.path === "hip"
+          ? "Hip path"
+          : figure.gear === "dumbbell" || figure.gear === "none"
+            ? "Hand path"
+            : "Bar path";
 
   return (
     <div ref={root} className="space-y-3.5">

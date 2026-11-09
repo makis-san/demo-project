@@ -143,6 +143,320 @@ const romanianDeadlift: FigureDef = {
   poses: [P(90, 0, 0, -2, 0, 178, 178), P(90, 3, -14, 36, 26, 184, 184), P(90, 6, -28, 70, 56, 192, 192)],
 };
 
+/* More figures. Each was checked against the floor, the bench and its fixed points (planted hands and feet, shoulders
+ * on the bench) with forward kinematics, so nothing sinks into the floor or slides while it moves. */
+
+const dumbbellBench: FigureDef = { ...bench, gear: "dumbbell" };
+const dumbbellCurl: FigureDef = { ...barbellCurl, gear: "dumbbell" };
+
+const pushUp: FigureDef = {
+  root: "toe",
+  at: [0, 0.07],
+  gear: "none",
+  read: ["elbow", "shoulder"],
+  path: "body",
+  first: "ecc",
+  poses: [
+    P(168, 73, 73, 73, 67, 180.7, 179.3),
+    P(168, 80.5, 80.5, 80.5, 74.5, 230.3, 142.8),
+    P(168, 88, 88, 88, 82, 258.9, 131.4),
+  ],
+};
+
+const frontSquat: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["knee", "hip"],
+  first: "ecc",
+  poses: [P(90, 2, 0, 2, 0, 80, -85), P(90, 22, -45, 14, 8, 92, -73), P(90, 40, -105, 22, 14, 100, -65)],
+};
+
+const gobletSquat: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "dumbbell",
+  read: ["knee", "hip"],
+  first: "ecc",
+  poses: [P(90, 2, 0, 2, 0, 160, 15), P(90, 22, -45, 14, 8, 172, 27), P(90, 40, -105, 20, 12, 178, 33)],
+};
+
+const sumoDeadlift: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["hip", "knee"],
+  first: "conc",
+  poses: [P(90, 26, -78, 48, 34, 180, 180), P(90, 10, -36, 30, 21, 180, 180), P(90, 2, 2, -3, -2, 180, 180)],
+};
+
+const stiffLegDeadlift: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["hip", "knee"],
+  first: "ecc",
+  poses: [P(90, 0, 0, -2, 0, 178, 178), P(90, 1, -8, 40, 28, 182, 182), P(90, 2, -14, 80, 64, 190, 190)],
+};
+
+const rackPull: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["hip", "knee"],
+  first: "conc",
+  poses: [P(90, 8, -38, 42, 30, 180, 180), P(90, 5, -18, 22, 14, 178, 179), P(90, 4, 2, -3, 0, 174, 178)],
+};
+
+const goodMorning: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["hip", "knee"],
+  first: "ecc",
+  poses: [P(90, 0, 0, 4, 4, -152, 18), P(90, 3, -13, 40, 30, -116, 54), P(90, 6, -26, 76, 62, -80, 90)],
+};
+
+const pendlayRow: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["elbow", "shoulder"],
+  first: "conc",
+  poses: [P(90, 14, -45, 86, 70, 180, 180), P(90, 14, -45, 85, 70, -140, 160), P(90, 14, -45, 84, 68, -100, 140)],
+};
+
+const pushPress: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "barbell",
+  read: ["knee", "elbow"],
+  first: "conc",
+  poses: [P(90, 0, 0, -4, -2, 150, -15), P(90, 16, -20, -3, -2, 150, -15), P(90, 0, 0, 0, 4, 2, 0)],
+};
+
+const frontRaise: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "dumbbell",
+  read: ["shoulder"],
+  first: "conc",
+  poses: [P(90, 0, 0, -2, 0, 172, 176), P(90, 0, 0, -3, 0, 132, 134), P(90, 0, 0, -5, 0, 92, 92)],
+};
+
+const kettlebellSwing: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "dumbbell",
+  read: ["hip"],
+  first: "conc",
+  poses: [P(90, 10, -30, 62, 48, 210, 210), P(90, 5, -14, 28, 20, 150, 150), P(90, 0, 0, -4, 0, 92, 92)],
+};
+
+const tricepsKickback: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "dumbbell",
+  read: ["elbow"],
+  first: "conc",
+  poses: [P(90, 8, -25, 68, 55, 258, 180), P(90, 8, -25, 68, 55, 258, 222), P(90, 8, -25, 68, 55, 258, 256)],
+};
+
+const overheadTricepsExtension: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "dumbbell",
+  read: ["elbow"],
+  first: "ecc",
+  poses: [P(90, 0, 0, 0, 4, -8, -8), P(90, 0, 0, 0, 6, -10, -85), P(90, 0, 0, 0, 8, -12, -150)],
+};
+
+/** A high cable: the "pullbar" gear draws the handle and the line up to the pulley. */
+const tricepsPushdown: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "pullbar",
+  read: ["elbow"],
+  first: "conc",
+  poses: [P(90, 0, 0, 8, 6, 172, 40), P(90, 0, 0, 8, 6, 174, 108), P(90, 0, 0, 8, 6, 176, 176)],
+};
+
+const straightArmPulldown: FigureDef = {
+  root: "ankle",
+  at: [0, 0.09],
+  gear: "pullbar",
+  read: ["shoulder"],
+  first: "conc",
+  poses: [P(90, 4, -10, 22, 16, 40, 36), P(90, 4, -10, 22, 16, 105, 102), P(90, 4, -10, 22, 16, 168, 166)],
+};
+
+const skullCrusher: FigureDef = {
+  root: "hip",
+  at: [0, 0.59],
+  gear: "dumbbell",
+  bench: true,
+  read: ["elbow"],
+  first: "ecc",
+  poses: [P(90, 10, -80, -90, -92, -12, -12), P(90, 10, -80, -90, -92, -14, -80), P(90, 10, -80, -90, -92, -16, -138)],
+};
+
+const pullover: FigureDef = {
+  root: "hip",
+  at: [0, 0.59],
+  gear: "dumbbell",
+  bench: true,
+  read: ["shoulder"],
+  first: "ecc",
+  poses: [P(90, 10, -80, -90, -92, -5, -10), P(90, 10, -80, -90, -92, -55, -62), P(90, 10, -80, -90, -92, -100, -106)],
+};
+
+/** Seated on the bench: the hip sits over the pad and the thighs run forward along it. */
+const seated: [number, number] = [-0.38, 0.58];
+
+const legExtension: FigureDef = {
+  root: "hip",
+  at: seated,
+  gear: "none",
+  bench: true,
+  read: ["knee"],
+  path: "heel",
+  first: "conc",
+  poses: [P(100, 10, -90, -6, -4, 176, 120), P(45, -45, -90, -6, -4, 176, 120), P(2, -88, -90, -6, -4, 176, 120)],
+};
+
+const seatedLegCurl: FigureDef = {
+  root: "hip",
+  at: seated,
+  gear: "none",
+  bench: true,
+  read: ["knee"],
+  path: "heel",
+  first: "conc",
+  poses: [P(2, -88, -90, -6, -4, 176, 120), P(45, -40, -90, -6, -4, 176, 120), P(110, 20, -90, -6, -4, 176, 120)],
+};
+
+const latPulldown: FigureDef = {
+  root: "hip",
+  at: seated,
+  gear: "pullbar",
+  bench: true,
+  read: ["elbow", "shoulder"],
+  first: "conc",
+  poses: [P(95, 5, -90, -10, -6, -3, -3), P(95, 5, -90, -14, -8, 60, -6), P(95, 5, -90, -18, -10, 140, -12)],
+};
+
+const seatedPress: FigureDef = {
+  root: "hip",
+  at: seated,
+  gear: "dumbbell",
+  bench: true,
+  read: ["elbow", "shoulder"],
+  first: "conc",
+  poses: [P(95, 5, -90, -2, -2, 150, -15), P(95, 5, -90, -3, -12, 70, -25), P(95, 5, -90, 0, 4, 2, 0)],
+};
+
+/** Lying on the floor, head to the left: the hip is pinned a body's thickness over the floor. */
+const onFloor: [number, number] = [0, 0.12];
+
+const crunch: FigureDef = {
+  root: "hip",
+  at: onFloor,
+  gear: "none",
+  read: ["hip"],
+  path: "body",
+  first: "conc",
+  poses: [
+    P(90, -20.3, -146.1, -90, -92, 88, 88),
+    P(90, -20.3, -146.1, -72, -60, 106, 106),
+    P(90, -20.3, -146.1, -55, -40, 123, 123),
+  ],
+};
+
+const sitUp: FigureDef = {
+  root: "hip",
+  at: onFloor,
+  gear: "none",
+  read: ["hip"],
+  path: "body",
+  first: "conc",
+  poses: [
+    P(90, -20.3, -146.1, -90, -92, 70, -90),
+    P(90, -20.3, -146.1, -50, -38, 110, -50),
+    P(90, -20.3, -146.1, -12, -4, 148, -12),
+  ],
+};
+
+const lyingLegRaise: FigureDef = {
+  root: "hip",
+  at: onFloor,
+  gear: "none",
+  read: ["hip"],
+  path: "heel",
+  first: "conc",
+  poses: [P(0, -90, -90, -90, -92, 92, 92), P(-35, -135, -135, -90, -92, 92, 92), P(-75, -172, -172, -90, -92, 92, 92)],
+};
+
+const gluteBridge: FigureDef = {
+  root: "ankle",
+  at: [0.5, 0.09],
+  gear: "none",
+  read: ["hip"],
+  path: "hip",
+  first: "conc",
+  poses: [
+    P(90, -24, -142, -90.9, -95, 92, 92),
+    P(90, -24, -128, -99.5, -95, 92, 92),
+    P(90, -24, -112, -111.9, -95, 92, 92),
+  ],
+};
+
+/** Shoulders on the edge of the bench, the bar on the hips. */
+const hipThrust: FigureDef = {
+  root: "ankle",
+  at: [0.95, 0.09],
+  gear: "barbell",
+  bench: true,
+  read: ["hip"],
+  path: "hip",
+  first: "conc",
+  poses: [
+    P(90, -17.3, -126, -50, -38, 69.5, 164.3),
+    P(90, 4.1, -106.4, -70, -58, 52.5, 136.7),
+    P(90, 9.8, -80.5, -92, -80, 37.7, 107.4),
+  ],
+};
+
+const hangingLegRaise: FigureDef = {
+  root: "wrist",
+  at: [0, 2.3],
+  gear: "pullbar",
+  read: ["hip"],
+  path: "heel",
+  first: "conc",
+  poses: [P(155, 20, 8, 2, 0, 0, 0), P(115, -40, -45, 8, 4, 4, 2), P(60, -92, -95, 14, 6, 6, 4)],
+};
+
+const hangingKneeRaise: FigureDef = {
+  root: "wrist",
+  at: [0, 2.3],
+  gear: "pullbar",
+  read: ["hip", "knee"],
+  path: "heel",
+  first: "conc",
+  poses: [P(155, 20, 8, 2, 0, 0, 0), P(150, 10, -45, 6, 3, 3, 2), P(140, 6, -102, 12, 5, 5, 3)],
+};
+
+/** Kneeling with the heels held down: the body falls forward from the knees, in one line. */
+const nordicCurl: FigureDef = {
+  root: "ankle",
+  at: [0, 0.1],
+  gear: "none",
+  read: ["knee"],
+  path: "body",
+  first: "ecc",
+  poses: [P(-100, 90, 0, 0, 0, 160, 40), P(-100, 90, 38, 38, 36, 198, 78), P(-100, 90, 72, 72, 68, 232, 120)],
+};
+
 /* ------------------------------------------------------------------------------------------------------------ */
 
 export const movementCatalog: CatalogMovement[] = [
@@ -199,6 +513,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Press them up and slightly together over your chest.",
     ],
     "Letting the dumbbells wander wide so your shoulders carry the load.",
+    { figure: dumbbellBench },
   ),
   m(
     "incline-dumbbell-press",
@@ -277,7 +592,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Press back up, keeping your body in one line.",
     ],
     "Sagging hips or flared elbows.",
-    { bodyWeight: true },
+    { bodyWeight: true, figure: pushUp },
   ),
   m(
     "close-grip-bench-press",
@@ -291,6 +606,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Press up until your arms are straight.",
     ],
     "Taking the grip so narrow that your wrists bend back.",
+    { figure: bench },
   ),
 
   // Shoulders
@@ -320,6 +636,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them to shoulder height under control.",
     ],
     "Arching your lower back off the seat.",
+    { figure: seatedPress },
   ),
   m(
     "arnold-press",
@@ -333,6 +650,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower while turning your palms back toward you.",
     ],
     "Rushing the turn so the weight swings.",
+    { figure: seatedPress },
   ),
   m(
     "machine-shoulder-press",
@@ -372,6 +690,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly.",
     ],
     "Leaning back to get the weight up.",
+    { figure: frontRaise },
   ),
   m(
     "rear-delt-fly",
@@ -424,6 +743,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower the bar back to your collarbone and reset.",
     ],
     "Dipping forward instead of straight down.",
+    { figure: pushPress },
   ),
 
   // Back
@@ -453,6 +773,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower the bar back to the pins under control.",
     ],
     "Leaning back at the top instead of finishing with your hips.",
+    { figure: rackPull },
   ),
   m(
     "barbell-row",
@@ -480,6 +801,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Return it to the floor and reset before the next rep.",
     ],
     "Standing up between reps or rounding the back as the bar leaves the floor.",
+    { figure: pendlayRow },
   ),
   m(
     "dumbbell-row",
@@ -545,6 +867,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Let it rise until your arms are straight.",
     ],
     "Pulling the bar behind your neck or leaning far back.",
+    { figure: latPulldown },
   ),
   m(
     "pull-up",
@@ -600,6 +923,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Let it rise back up with straight arms.",
     ],
     "Bending the elbows so it becomes a triceps pushdown.",
+    { figure: straightArmPulldown },
   ),
   m(
     "barbell-shrug",
@@ -652,6 +976,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Drive your hips forward to stand tall.",
     ],
     "Rounding the lower back or squatting the weight instead of hinging.",
+    { figure: goodMorning },
   ),
 
   // Biceps
@@ -681,6 +1006,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly.",
     ],
     "Letting your elbows drift forward.",
+    { figure: dumbbellCurl },
   ),
   m(
     "hammer-curl",
@@ -694,6 +1020,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them under control.",
     ],
     "Swinging the dumbbells instead of curling them.",
+    { figure: dumbbellCurl },
   ),
   m(
     "preacher-curl",
@@ -759,6 +1086,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower it under control.",
     ],
     "Letting your wrists bend back as the bar rises.",
+    { figure: barbellCurl },
   ),
 
   // Triceps
@@ -774,6 +1102,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Let it rise until your forearms are just past horizontal.",
     ],
     "Letting your elbows flare or drift forward.",
+    { figure: tricepsPushdown },
   ),
   m(
     "skull-crusher",
@@ -787,6 +1116,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Extend your arms back to the start.",
     ],
     "Flaring your elbows wide so the shoulders do the work.",
+    { figure: skullCrusher },
   ),
   m(
     "overhead-triceps-extension",
@@ -800,6 +1130,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Extend your arms back overhead.",
     ],
     "Arching your back as the weight goes down.",
+    { figure: overheadTricepsExtension },
   ),
   m(
     "dip",
@@ -841,7 +1172,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Press back up.",
     ],
     "Letting your elbows flare out.",
-    { bodyWeight: true },
+    { bodyWeight: true, figure: pushUp },
   ),
   m(
     "triceps-kickback",
@@ -855,6 +1186,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Bring it back to the start slowly.",
     ],
     "Swinging the dumbbell instead of moving only the forearm.",
+    { figure: tricepsKickback },
   ),
 
   // Legs
@@ -884,6 +1216,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Stand up, keeping your elbows high.",
     ],
     "Elbows dropping, which lets the bar roll forward.",
+    { figure: frontSquat },
   ),
   m(
     "goblet-squat",
@@ -897,6 +1230,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Stand back up.",
     ],
     "Tipping forward as you reach the bottom.",
+    { figure: gobletSquat },
   ),
   m(
     "hack-squat",
@@ -936,6 +1270,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Press back up.",
     ],
     "Standing with your feet directly under the bar, which strains the knees.",
+    { figure: squat },
   ),
   m(
     "bulgarian-split-squat",
@@ -1015,6 +1350,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Return to standing by driving your hips forward.",
     ],
     "Rounding the lower back to reach further down.",
+    { figure: stiffLegDeadlift },
   ),
   m(
     "sumo-deadlift",
@@ -1028,6 +1364,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower the bar under control to the floor.",
     ],
     "Knees caving in as you pull.",
+    { figure: sumoDeadlift },
   ),
   m(
     "leg-extension",
@@ -1041,6 +1378,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly.",
     ],
     "Swinging the weight up with momentum.",
+    { figure: legExtension },
   ),
   m(
     "lying-leg-curl",
@@ -1067,6 +1405,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Return slowly.",
     ],
     "Letting the weight stack drop at the end.",
+    { figure: seatedLegCurl },
   ),
   m(
     "hip-thrust",
@@ -1080,6 +1419,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower your hips under control.",
     ],
     "Arching your lower back at the top instead of tucking your ribs.",
+    { figure: hipThrust },
   ),
   m(
     "glute-bridge",
@@ -1093,6 +1433,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower your hips slowly.",
     ],
     "Pushing through your toes, which shifts the work to your quads.",
+    { figure: gluteBridge },
   ),
   m(
     "cable-pull-through",
@@ -1145,6 +1486,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Catch yourself with your hands and push back up.",
     ],
     "Bending at the hips instead of keeping your body in one line.",
+    { figure: nordicCurl },
   ),
   m(
     "standing-calf-raise",
@@ -1187,6 +1529,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower slowly.",
     ],
     "Pulling on your neck instead of curling your torso.",
+    { figure: crunch },
   ),
   m(
     "cable-crunch",
@@ -1213,6 +1556,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower under control.",
     ],
     "Yanking your head forward or dropping back quickly.",
+    { figure: sitUp },
   ),
   m(
     "decline-sit-up",
@@ -1239,7 +1583,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly without swinging.",
     ],
     "Swinging your body to get your legs up.",
-    { bodyWeight: true },
+    { bodyWeight: true, figure: hangingLegRaise },
   ),
   m(
     "hanging-knee-raise",
@@ -1253,7 +1597,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly.",
     ],
     "Using only your hip flexors without curling your pelvis.",
-    { bodyWeight: true },
+    { bodyWeight: true, figure: hangingKneeRaise },
   ),
   m(
     "lying-leg-raise",
@@ -1267,6 +1611,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Lower them slowly without letting your back arch.",
     ],
     "Your lower back arching off the floor as your legs lower.",
+    { figure: lyingLegRaise },
   ),
   m(
     "ab-wheel-rollout",
@@ -1388,6 +1733,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Pull it back over your chest.",
     ],
     "Bending the elbows so far that it becomes a triceps extension.",
+    { figure: pullover },
   ),
   m(
     "cable-lateral-raise",
@@ -1416,6 +1762,7 @@ export const movementCatalog: CatalogMovement[] = [
       "Let it fall and hinge back to receive it.",
     ],
     "Lifting the bell with your arms instead of your hips.",
+    { figure: kettlebellSwing },
   ),
   m(
     "power-clean",
