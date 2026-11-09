@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
-import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library } from "lucide-react";
+import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library, UserRound } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { logoutServerFn } from "@/lib/auth.server";
 import { Logo } from "@/components/logo";
@@ -22,6 +22,7 @@ const navItems = [
   { to: "/workout-history", label: "Workout History", short: "History", icon: History },
   { to: "/movements", label: "Movements", short: "Moves", icon: BicepsFlexed },
   { to: "/body-weight", label: "Body Weight", short: "Weight", icon: Scale },
+  { to: "/account", label: "Account", short: "Account", icon: UserRound },
 ] as const;
 
 // The same links are a floating dock along the bottom on a phone and a floating sidebar from md up. The classes
@@ -66,7 +67,7 @@ function RouteComponent() {
           <Logo />
         </Link>
         <p className="eyebrow mb-3 hidden px-3.5 md:block">Train</p>
-        <div className="relative flex flex-[6] md:flex-1 md:flex-col">
+        <div className="relative flex flex-[7] md:flex-1 md:flex-col">
           {/* One highlight that slides to the page you open. The links are all the same size, so the page's
               position in the list is all it needs: across the dock on a phone, down the sidebar from md up. */}
           {activeIndex >= 0 && (

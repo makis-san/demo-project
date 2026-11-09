@@ -24,15 +24,23 @@ model User {
 // A signed-in browser. The cookie holds a random token, and only its SHA-256 is
 // stored, so a copy of this table cannot be used to sign in. Deleting the row
 // signs that browser out.
+//
+// expiresAt slides forward while the browser is used, but never past createdAt plus
+// 30 days (src/lib/auth.server.ts). lastSeenAt is written at most once an hour, so
+// it is only as exact as that. deviceLabel is "Chrome on macOS", made from the
+// user agent at sign-in, for the list on the Account page.
 model Session {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  tokenHash   String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  deviceLabel String   @default("Unknown device")
 
   @@index([expiresAt])
+  @@index([userId])
 }
 
 // The muscle groups a movement can train. Kept in step with src/lib/muscles.ts.

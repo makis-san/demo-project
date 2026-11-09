@@ -1,6 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 
-type Section = "Home" | "Current Workout" | "Workout Library" | "Workout History" | "Movements" | "Body Weight";
+type Section =
+  | "Home"
+  | "Current Workout"
+  | "Workout Library"
+  | "Workout History"
+  | "Movements"
+  | "Body Weight"
+  | "Account";
 
 /** Opens a page from the sidebar, the way a user would. */
 export async function goTo(page: Page, section: Section) {

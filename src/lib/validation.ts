@@ -29,3 +29,11 @@ export const recordedAtSchema = z.coerce
  * being used as a lookup key.
  */
 export const emailSchema = z.string().trim().toLowerCase().max(254).pipe(z.email());
+
+/**
+ * The shortest password that can be set. NIST SP 800-63B asks for 8 and advises against rules like "needs a digit",
+ * which push people to predictable passwords. It is checked only when a password is set (sign-up and password change),
+ * so an account made under an older rule still signs in. The longest is a limit on work: hashing is slow on purpose.
+ */
+export const minPasswordLength = 8;
+export const passwordSchema = z.string().min(minPasswordLength).max(128);

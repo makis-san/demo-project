@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { test as base, expect, request, type BrowserContext, type Page } from "@playwright/test";
 import { breakWrites, getDb } from "./db";
+import { hashPassword } from "../src/lib/password.server";
 import { gotoApp, newTestUser, signUp, submitSignIn, type TestUser } from "./fixtures";
 
 // These tests use plain pages. The `page` from ./fixtures is already signed in, and here the sign-up and
@@ -60,6 +61,69 @@ test.describe("Email addresses", () => {
     await submitSignIn(page, user.email.toUpperCase(), user.password);
     await expect(page).toHaveURL(/\/home/);
     await expect(page.getByText(user.name)).toBeVisible();
+  });
+});
+
+test.describe("Password length", () => {
+  /** Fills the sign-up form with a password of the given length and presses the button. */
+  async function trySignUp(page: Page, user: TestUser, password: string) {
+    await gotoApp(page, "/create-account");
+    await page.getByLabel("Name").fill(user.name);
+    await page.getByLabel("Email").fill(user.email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Create account" }).click();
+  }
+
+  test("should not let the form send a 7-character password", async ({ freshPage }) => {
+    const user = newTestUser();
+    const page = await freshPage();
+
+    await trySignUp(page, user, "1234567");
+
+    // The browser's own check stops it before anything is sent.
+    expect(await page.getByLabel("Password").evaluate((input: HTMLInputElement) => input.validity.tooShort)).toBe(true);
+    await expect(page).toHaveURL(/\/create-account/);
+    expect(await getDb().user.count({ where: { email: user.email } })).toBe(0);
+  });
+
+  test("should refuse a 7-character password on the server too", async ({ freshPage }) => {
+    // Anyone can skip the page's check, so the server has the same rule. Take the attribute off to get past the browser.
+    const user = newTestUser();
+    const page = await freshPage();
+    await gotoApp(page, "/create-account");
+    await page.getByLabel("Password").evaluate((input: HTMLInputElement) => input.removeAttribute("minlength"));
+    await page.getByLabel("Name").fill(user.name);
+    await page.getByLabel("Email").fill(user.email);
+    await page.getByLabel("Password").fill("1234567");
+    await page.getByRole("button", { name: "Create account" }).click();
+
+    await expect(page.getByText("Invalid input")).toBeVisible();
+    await expect(page).toHaveURL(/\/create-account/);
+    expect(await getDb().user.count({ where: { email: user.email } })).toBe(0);
+  });
+
+  test("should accept an 8-character password and sign in with it", async ({ freshPage }) => {
+    const user = { ...newTestUser(), password: "12345678" };
+    const page = await freshPage();
+
+    await trySignUp(page, user, user.password);
+    await expect(page).toHaveURL(/\/home/);
+
+    await submitSignIn(await freshPage(), user.email, user.password);
+  });
+
+  test("should still let an account with a shorter password sign in", async ({ freshPage }) => {
+    // The rule is checked when a password is set, so older accounts are not locked out. Made in the database
+    // with the hash of a 6-character password, which sign-up would refuse now.
+    const user = { ...newTestUser(), password: "abc123" };
+    await getDb().user.create({
+      data: { email: user.email, name: user.name, passwordHash: await hashPassword(user.password) },
+    });
+
+    const page = await freshPage();
+    await submitSignIn(page, user.email, user.password);
+
+    await expect(page).toHaveURL(/\/home/);
   });
 });
 
