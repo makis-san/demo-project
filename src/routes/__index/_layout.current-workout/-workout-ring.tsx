@@ -462,8 +462,10 @@ export function WorkoutRing(props: RingProps) {
       aria-label="Workout progress">
       <h3 className="text-sm font-medium text-muted max-md:sr-only sm:p-0">{props.title}</h3>
 
-      {/* On a phone the ring is as wide as the screen, or as tall as is left above the set bar: it is read from a distance. */}
-      <div className="@container relative mx-auto mt-1 aspect-square w-[max(10rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,17.75rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
+      {/* On a phone the ring is as wide as its column, or as tall as is left above the set bar: it is read from a
+          distance. 100% and not 100vw: the viewport also counts a desktop scrollbar and any padding around the column, so
+          a vw-sized ring came out wider than its parent, could not be centred, and pushed the page wider than the screen. */}
+      <div className="@container relative mx-auto mt-1 aspect-square w-[max(10rem,min(100%,calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,17.75rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
         <svg
           ref={svgRef}
           viewBox="0 0 120 120"
