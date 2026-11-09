@@ -6,7 +6,7 @@ import { sessionCookieName } from "./auth.consts";
 import { configService } from "./config.server";
 import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
 import { errorMiddleware } from "./errors.server";
-import { emailSchema } from "./validation";
+import { emailSchema, passwordSchema } from "./validation";
 import { z } from "zod";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password.server";
 import {
@@ -122,7 +122,7 @@ export const signInServerFn = createServerFn({ method: "POST" })
  */
 export const createAccountServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware])
-  .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: z.string().min(6).max(128) }))
+  .inputValidator(z.object({ email: emailSchema, name: z.string().min(1), password: passwordSchema }))
   .handler(async ({ data }: { data: { email: string; name: string; password: string } }) => {
     const { email, name, password } = data;
 
