@@ -165,7 +165,7 @@ test.describe("Editing body weight", () => {
 
     await expect(entries(page).first()).toContainText("179.4 lbs");
     await expect(chart(page).locator("circle title").last()).toContainText("179.4 lbs on");
-    await expect(page.getByText("Latest", { exact: true }).locator("..")).toContainText("179.4");
+    await expect(page.getByRole("region", { name: "Over time" })).toContainText("179.4 lbs");
 
     // Move the other entry's date back, and it becomes the older one.
     await entries(page).first().getByRole("button", { name: "Edit entry" }).click();

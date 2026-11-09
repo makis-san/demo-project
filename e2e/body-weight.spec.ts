@@ -29,6 +29,9 @@ test.describe("Body weight", () => {
     const entries = page.getByRole("list", { name: "Body weight entries" }).getByRole("listitem");
     await expect(entries.first()).toContainText("179.6 lbs");
 
+    // Delete is inside the edit of an entry, not on the row.
+    await expect(entries.first().getByRole("button", { name: "Delete entry" })).toHaveCount(0);
+    await entries.first().getByRole("button", { name: "Edit entry" }).click();
     await entries.first().getByRole("button", { name: "Delete entry" }).click();
     await expect(entries).toHaveCount(2);
     await expect(chart.locator("circle")).toHaveCount(2);

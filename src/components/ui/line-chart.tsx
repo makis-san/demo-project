@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { evenlySpaced, niceTicks } from "@/lib/chart-scale";
 
 export type ChartPoint = {
@@ -22,7 +22,8 @@ type LineChartProps = {
 // so it renders the same on the server and in the browser without measuring.
 // It never gets narrower than that drawing, so its text stays at the size it is drawn at (11px). On a screen
 // narrower than the drawing it scrolls sideways inside its card, because scaled down to a phone's width the
-// text would be about 5px.
+// text would be about 5px. It opens scrolled to the end, where the latest reading and the last date are, and the
+// y axis labels are a column that sticks to the left edge, so they stay in view while the plot moves.
 const width = 640;
 const height = 280;
 const margin = { top: 16, right: 24, bottom: 36, left: 56 };
@@ -68,14 +69,23 @@ export function LineChart({
       ? `${path} L${scaleX(points[points.length - 1].x).toFixed(1)},${baseline} L${scaleX(points[0].x).toFixed(1)},${baseline} Z`
       : "";
 
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [points.length]);
+
   return (
-    <div className="overflow-x-auto rounded-2xl" tabIndex={0}>
+    <div
+      ref={scroller}
+      className="grid overflow-x-auto rounded-2xl"
+      style={{ gridTemplateColumns: `minmax(${width}px, 1fr)` }}
+      tabIndex={0}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={ariaLabel}
-        className="w-full h-auto"
-        style={{ minWidth: width }}>
+        className="col-start-1 row-start-1 h-auto w-full">
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.32} />
@@ -83,25 +93,16 @@ export function LineChart({
           </linearGradient>
         </defs>
         {yTicks.map((tick) => (
-          <g key={tick}>
-            <line
-              x1={margin.left}
-              x2={width - margin.right}
-              y1={scaleY(tick)}
-              y2={scaleY(tick)}
-              className="stroke-line"
-              strokeDasharray="2 6"
-              strokeLinecap="round"
-            />
-            <text
-              x={margin.left - 8}
-              y={scaleY(tick)}
-              textAnchor="end"
-              dominantBaseline="middle"
-              className="num fill-faint text-[11px]">
-              {formatY(tick)}
-            </text>
-          </g>
+          <line
+            key={tick}
+            x1={margin.left}
+            x2={width - margin.right}
+            y1={scaleY(tick)}
+            y2={scaleY(tick)}
+            className="stroke-line"
+            strokeDasharray="2 6"
+            strokeLinecap="round"
+          />
         ))}
         {xLabels.map((tick) => (
           <text
@@ -137,6 +138,24 @@ export function LineChart({
           </circle>
         ))}
       </svg>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none sticky left-0 z-10 col-start-1 row-start-1 bg-gradient-to-r from-ground/60 via-ground/30 to-transparent"
+        style={{ width: `${((margin.left + 8) / width) * 100}%` }}>
+        {yTicks.map((tick) => (
+          <span
+            key={tick}
+            className="num absolute text-right text-[11px] text-faint lg:text-[13px]"
+            style={{
+              top: `${(scaleY(tick) / height) * 100}%`,
+              width: `${(margin.left / width) * 100}%`,
+              paddingRight: `${(8 / width) * 100}%`,
+              transform: "translateY(-50%)",
+            }}>
+            {formatY(tick)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
