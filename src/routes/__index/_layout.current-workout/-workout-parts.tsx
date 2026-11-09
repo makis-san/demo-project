@@ -541,8 +541,8 @@ export function SetList({
                       "flex flex-wrap items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-3",
                       set.id === newestId && "enter shadow-[inset_3px_0_0_var(--color-primary)]",
                     )}>
-                    <span className="num w-11 shrink-0 text-xs font-semibold text-faint" aria-hidden="true">
-                      SET {i + 1}
+                    <span className="num w-11 shrink-0 text-xs text-muted" aria-hidden="true">
+                      Set {i + 1}
                     </span>
                     <span className="sr-only">{set.movement.name}</span>
                     <SetValues set={set} />
