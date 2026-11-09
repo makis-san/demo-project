@@ -9,14 +9,14 @@ import { Library, Play, Plus } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 import { WorkoutCard } from "@/components/workout-card";
 import { presetsQueryKey, todayQueryOptions } from "../_layout.workout-library/-queries/presets";
-import { useSuspenseQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { currentWorkoutQueryOptions } from "./-queries/current-workout";
 import { MovementBrowser } from "@/components/movement-browser";
 import { Confetti } from "@/components/confetti";
 import type { MovementOption } from "@/components/movement-card";
 import {
+  movementBestsQueryOptions,
   progressionQueryKey,
-  progressionQueryOptions,
   workoutHistoryQueryKey,
 } from "../_layout.workout-history/-queries/workout-history";
 import { latestBodyWeightQueryOptions } from "../_layout.body-weight/-queries/body-weight";
@@ -114,27 +114,26 @@ function CurrentWorkoutPage() {
     if (running) setEnded(false);
   }, [running]);
 
-  // History for every movement in the session and the one picked: the last top set, the best, and so the PRs.
-  // These are the chart's queries, so the history page reuses what this page fetched, and the other way round.
+  // History for every movement in the session and the one picked: the last top set, the best, and so the PRs. One request
+  // answers for all of them. The previous answer stays on screen while a new movement's is on its way, so the PR badges
+  // of the movements already in the workout do not blink off.
   const historyIds = useMemo(
     () => [...new Set([...sets.map((set) => set.movement.id), ...(selectedMovement ? [selectedMovement] : [])])],
     [sets, selectedMovement],
   );
-  const historyQueries = useQueries({
-    queries: historyIds.map((id) => ({ ...progressionQueryOptions(id, timeZone), enabled: !!workout })),
+  const { data: bests, isPlaceholderData } = useQuery({
+    ...movementBestsQueryOptions(historyIds, timeZone),
+    enabled: !!workout && historyIds.length > 0,
+    placeholderData: keepPreviousData,
   });
+  // A movement with no row was never trained ("first time", null). That is only known from an answer to this exact
+  // question: a placeholder from before the movement was added says nothing about it, so it stays unknown (undefined).
   const history = new Map<string, MovementHistory>();
-  historyIds.forEach((id, i) => {
-    const data = historyQueries[i]?.data;
-    if (!data) return;
-    const last = data.days[data.days.length - 1];
-    history.set(
-      id,
-      last
-        ? { lastTop: last.maxWeight, lastDay: last.day, best: Math.max(...data.days.map((d) => d.maxWeight)) }
-        : null,
-    );
-  });
+  for (const id of historyIds) {
+    const best = bests?.find((b) => b.movementId === id);
+    if (best) history.set(id, { lastTop: best.lastTop, lastDay: best.lastDay, best: best.best });
+    else if (bests && !isPlaceholderData) history.set(id, null);
+  }
   const prs = personalRecords(sets, history);
 
   const needsBodyWeight = !!selected?.isBodyWeight && latestBodyWeight === null;

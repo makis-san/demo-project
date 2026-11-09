@@ -88,6 +88,65 @@ export const getProgressionServerFn = createServerFn()
     },
   );
 
+export type MovementBest = {
+  movementId: string;
+  /** The heaviest weight of the movement's most recent day. */
+  lastTop: number;
+  /** That day in the user's timezone, as YYYY-MM-DD. */
+  lastDay: string;
+  /** The heaviest weight ever lifted for the movement. */
+  best: number;
+};
+
+/**
+ * What the current workout needs from each movement's history, for the "last time" hint and the PR badges: the top
+ * weight of the last day it was trained, that day, and the best weight ever. Two numbers and a date per movement,
+ * where the chart's query returns every day and workout. One request answers for every movement in the workout.
+ *
+ * It follows the chart's rules, so the numbers are the same ones: completed workouts only, and a day is the day the
+ * workout was completed in the user's timezone. A movement that was never trained has no row, which the page reads as
+ * "first time". Another user's movement id just has no row, because the sets are filtered by the workout's owner.
+ */
+export const getMovementBestsServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .inputValidator(z.object({ movementIds: z.array(z.string()).max(200) }))
+  .handler(
+    async ({
+      context,
+      data,
+    }: {
+      context: { user: { id: string } };
+      data: { movementIds: string[] };
+    }): Promise<MovementBest[]> => {
+      if (data.movementIds.length === 0) return [];
+      const prisma = await getServerSidePrismaClient();
+      const timeZone = resolveTimeZone();
+      // One row per movement and day first, then DISTINCT ON keeps the newest day of each movement. The window MAX runs
+      // before DISTINCT ON picks a row, so `best` still covers every day, not only the newest.
+      return prisma.$queryRaw<MovementBest[]>`
+        WITH days AS (
+          SELECT
+            s."movementId",
+            (w."completedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone})::date AS "day",
+            MAX(s."weight") AS "topWeight"
+          FROM "Set" s
+          JOIN "Workout" w ON w."id" = s."workoutId"
+          WHERE w."userId" = ${context.user.id}
+            AND s."movementId" = ANY(${data.movementIds}::text[])
+            AND w."completedAt" IS NOT NULL
+          GROUP BY s."movementId", 2
+        )
+        SELECT DISTINCT ON ("movementId")
+          "movementId",
+          "topWeight"::float8 AS "lastTop",
+          to_char("day", 'YYYY-MM-DD') AS "lastDay",
+          (MAX("topWeight") OVER (PARTITION BY "movementId"))::float8 AS "best"
+        FROM days
+        ORDER BY "movementId", "day" DESC
+      `;
+    },
+  );
+
 export type CalendarDay = {
   /** The day in the user's timezone, as YYYY-MM-DD. */
   day: string;
