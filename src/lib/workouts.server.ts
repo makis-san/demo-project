@@ -335,6 +335,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
       orderBy: [{ completedAt: "desc" }, { id: "desc" }],
       take: historyPageSize + 1,
       include: {
+        preset: { select: { name: true } },
         sets: {
           include: { movement: true },
           orderBy: setOrder,
@@ -343,14 +344,44 @@ export const getWorkoutHistoryServerFn = createServerFn()
     });
 
     const hasMore = rows.length > historyPageSize;
-    const workouts = rows.slice(0, historyPageSize).map((workout) => ({
+    const workouts = rows.slice(0, historyPageSize).map(({ preset, ...workout }) => ({
       ...workout,
+      presetName: preset?.name ?? null,
       sets: workout.sets.map(withNumberWeight),
     }));
     const last = workouts.at(-1);
     const nextCursor: HistoryCursor | null =
       hasMore && last?.completedAt ? { completedAt: last.completedAt, id: last.id } : null;
     return { workouts, nextCursor };
+  });
+
+/**
+ * The user's latest completed workout in short: when it was, what it was started from, and what it held. The home
+ * screen shows it as a line and offers to repeat it, without loading a page of history for that.
+ */
+export const getLastWorkoutServerFn = createServerFn()
+  .middleware([errorMiddleware, authMiddleware])
+  .handler(async ({ context }) => {
+    const prisma = await getServerSidePrismaClient();
+    const workout = await prisma.workout.findFirst({
+      where: { userId: context.user.id, completedAt: { not: null } },
+      orderBy: [{ completedAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        completedAt: true,
+        preset: { select: { name: true } },
+        sets: { orderBy: setOrder, select: { movement: { select: { name: true } } } },
+      },
+    });
+    if (!workout?.completedAt) return null;
+    const movements = [...new Set(workout.sets.map((set) => set.movement.name))];
+    return {
+      id: workout.id,
+      completedAt: workout.completedAt,
+      presetName: workout.preset?.name ?? null,
+      setCount: workout.sets.length,
+      movements,
+    };
   });
 
 /**

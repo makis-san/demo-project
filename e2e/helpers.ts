@@ -9,9 +9,35 @@ type Section =
   | "Body Weight"
   | "Account";
 
-/** Opens a page from the sidebar, the way a user would. */
+/**
+ * Opens a page from the sidebar, the way a user would. On a phone there is a dock with five items instead, and the two
+ * libraries are one of them: Library, then the Workouts / Movements switch at the top of it.
+ */
 export async function goTo(page: Page, section: Section) {
-  await page.getByRole("link", { name: section, exact: true }).click();
+  const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  // A workout in progress is a focus screen on a phone, with no dock: Minimize is the way out, to Home.
+  const minimize = page.getByRole("link", { name: "Minimize workout" });
+  if (phone && (await minimize.isVisible())) {
+    await minimize.click();
+    await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
+  }
+  if (phone && section === "Account") {
+    // No room in the dock: Account is in the round menu at the top of Home, next to Log out.
+    if (!(await page.getByRole("heading", { level: 1, name: "Home" }).isVisible())) {
+      await page.getByRole("link", { name: "Home", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
+    }
+    await page.getByRole("button", { name: "Account" }).click();
+    await page.getByRole("link", { name: "Account settings" }).click();
+  } else if (phone && (section === "Movements" || section === "Workout Library")) {
+    const tab = page
+      .getByRole("navigation", { name: "Library" })
+      .getByRole("link", { name: section === "Movements" ? "Movements" : "Workouts", exact: true });
+    if (!(await tab.isVisible())) await page.getByRole("link", { name: "Library", exact: true }).click();
+    await tab.click();
+  } else {
+    await page.getByRole("link", { name: section, exact: true }).click();
+  }
   await expect(page.getByRole("heading", { level: 1, name: section })).toBeVisible();
 }
 
@@ -37,7 +63,9 @@ export function movementRow(page: Page, name: string) {
  * tap the movement. The set form then shows for it.
  */
 export async function selectMovement(page: Page, name: string) {
-  await page.getByRole("button", { name: "Add movement", exact: true }).click();
+  // On a phone the bar at the bottom is "Add movement" until a movement is picked, then a row that changes it. On a
+  // desktop it is the "+" at the top. Only one of them is on the screen at a time.
+  await page.getByRole("button", { name: /^(Add movement$|Change movement)/ }).click();
   const sheet = page.getByRole("dialog", { name: "Choose a movement" });
   await sheet.getByRole("searchbox", { name: "Search movements" }).fill(name);
   await sheet.getByRole("button", { name, exact: true }).click();

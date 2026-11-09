@@ -102,12 +102,9 @@ export function MovementBrowser(props: Props) {
         {/* The grab handle of a bottom sheet. It only shows on a phone. */}
         <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
         <div className="flex items-center justify-between gap-3 px-4 pt-3 sm:px-5 sm:pt-4">
-          <div>
-            <p className="eyebrow">{single ? "Current workout" : "Workout"}</p>
-            <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">
-              {single ? "Choose a movement" : "Add movements"}
-            </h2>
-          </div>
+          <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">
+            {single ? "Choose a movement" : "Add movements"}
+          </h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
           </Button>

@@ -70,10 +70,7 @@ export function ProgressionChart({
   return (
     <Card className="enter enter-2">
       <CardHeader className="gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1.5">
-          <p className="eyebrow">Trend</p>
-          <CardTitle>Progression</CardTitle>
-        </div>
+        <CardTitle>Progression</CardTitle>
         {latest && (
           <div className="flex items-end gap-6">
             <Stat label={`Latest ${label.toLowerCase()}`} value={numberFormat.format(latest.y)} unit={unit} morph />

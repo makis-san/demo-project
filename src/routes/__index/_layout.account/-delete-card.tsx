@@ -37,7 +37,6 @@ export function DeleteCard() {
     <Card className="enter enter-3 border-danger/30 p-3 sm:p-4">
       <div className="space-y-5 p-2">
         <div className="space-y-1">
-          <p className="eyebrow text-danger">Danger zone</p>
           <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Delete account</h2>
           <p className="text-sm text-muted">
             Deletes your workouts, sets, movements, body weights, workout library and every signed-in device. This can't

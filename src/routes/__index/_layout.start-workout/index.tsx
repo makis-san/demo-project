@@ -4,7 +4,6 @@ import { ArrowLeft, Pencil, Play, Timer } from "lucide-react";
 import { useState } from "react";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { prefersReducedMotion, StartCountdown } from "@/components/start-countdown";
-import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { MovementThumb } from "@/components/movement-figure/movement-thumb";
 import { startWorkoutServerFn } from "@/lib/workouts.server";
@@ -75,9 +74,9 @@ function StartWorkoutPage() {
     preview.kind === "repeat" && preview.subtitle ? `From ${formatDate(preview.subtitle, timeZone, fullDate)}` : null;
 
   return (
-    <div className="space-y-6">
+    // On a phone the page is at least a screen tall and the buttons sit at its bottom, in the thumb's reach above the dock.
+    <div className="flex flex-col space-y-6 max-md:min-h-[calc(100dvh-9.5rem)]">
       <PageHeader
-        eyebrow={preview.kind === "preset" ? "Workout" : "Before you start"}
         title={preview.title}
         actions={
           preview.kind === "preset" && search.preset ? (
@@ -92,63 +91,57 @@ function StartWorkoutPage() {
         }
       />
 
-      <Card className="enter enter-1 space-y-4 p-4 sm:p-6">
-        {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
-        {preview.exercises.length === 0 ? (
-          <p className="text-sm text-muted">
-            An empty workout. Add movements and log sets as you go, with the rest timer after every set.
+      {preview.exercises.length === 0 ? (
+        <p className="enter enter-1 text-muted">Add movements as you go.</p>
+      ) : (
+        <div className="enter enter-1 space-y-4">
+          {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
+
+          <p className="num text-sm text-muted">
+            {plural(preview.exercises.length, "movement")} · {plural(totalSets, "set")}
           </p>
-        ) : (
-          <>
-            <p className="num text-sm text-muted">
-              {plural(preview.exercises.length, "movement")} · {plural(totalSets, "set")}
-            </p>
-            <ul className="space-y-3" aria-label="Movements in this workout">
-              {preview.exercises.map((exercise) => (
-                <li
-                  key={exercise.movement.id}
-                  className="rounded-2xl bg-well p-3"
-                  data-movement={exercise.movement.name}>
-                  <div className="flex items-center gap-3">
-                    <MovementThumb
-                      primary={exercise.movement.primaryMuscles}
-                      secondary={exercise.movement.secondaryMuscles}
-                      className="h-12 w-12 shrink-0 rounded-xl"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-medium text-chalk">{exercise.movement.name}</p>
-                      <p className="num flex items-center gap-1.5 text-xs text-faint">
-                        {plural(exercise.sets.length, "set")}
-                        {exercise.restSeconds !== null && exercise.restSeconds > 0 && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <Timer className="h-3 w-3" aria-hidden="true" />
-                            <span>{formatClock(exercise.restSeconds)} rest</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
+          <ul className="space-y-3" aria-label="Movements in this workout">
+            {preview.exercises.map((exercise) => (
+              <li key={exercise.movement.id} className="rounded-2xl bg-well p-3" data-movement={exercise.movement.name}>
+                <div className="flex items-center gap-3">
+                  <MovementThumb
+                    primary={exercise.movement.primaryMuscles}
+                    secondary={exercise.movement.secondaryMuscles}
+                    className="h-12 w-12 shrink-0 rounded-xl"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-medium text-chalk">{exercise.movement.name}</p>
+                    <p className="num flex items-center gap-1.5 text-xs text-faint">
+                      {plural(exercise.sets.length, "set")}
+                      {exercise.restSeconds !== null && exercise.restSeconds > 0 && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <Timer className="h-3 w-3" aria-hidden="true" />
+                          <span>{formatClock(exercise.restSeconds)} rest</span>
+                        </>
+                      )}
+                    </p>
                   </div>
-                  <ol className="mt-2 grid gap-1 pl-1 sm:grid-cols-2">
-                    {exercise.sets.map((set, i) => (
-                      <li key={i} className="num flex items-center gap-2 text-sm text-muted">
-                        <span className="w-9 text-xs font-semibold text-faint">SET {i + 1}</span>
-                        <span className="font-semibold text-chalk">{set.reps}</span> reps
-                        {set.weight !== null && (
-                          <>
-                            {" "}
-                            × <span className="font-semibold text-chalk">{set.weight}</span> {weightUnit}
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Card>
+                </div>
+                <ol className="mt-2 grid gap-1 pl-1 sm:grid-cols-2">
+                  {exercise.sets.map((set, i) => (
+                    <li key={i} className="num flex items-center gap-2 text-sm text-muted">
+                      <span className="w-9 text-xs text-muted">Set {i + 1}</span>
+                      <span className="font-semibold text-chalk">{set.reps}</span> reps
+                      {set.weight !== null && (
+                        <>
+                          {" "}
+                          × <span className="font-semibold text-chalk">{set.weight}</span> {weightUnit}
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {counting && (
         <StartCountdown
@@ -160,7 +153,7 @@ function StartWorkoutPage() {
         />
       )}
 
-      <div className="enter enter-2 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="enter enter-2 -mx-4 mt-auto flex flex-col gap-3 bg-linear-to-t from-ground from-70% to-transparent px-4 pt-6 pb-1 max-md:sticky max-md:bottom-0 max-md:z-10 max-md:-mb-24 max-md:pb-[max(6rem,calc(env(safe-area-inset-bottom)+5.25rem))] sm:flex-row sm:items-center md:static md:mx-0 md:mt-0 md:bg-none md:p-0">
         {preview.hasActiveWorkout ? (
           <>
             <Button size="lg" disabled className="w-full sm:w-auto">

@@ -45,7 +45,6 @@ export function PasswordCard() {
         }}
         className="space-y-5 p-2">
         <div className="space-y-1">
-          <p className="eyebrow">Password</p>
           <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Change password</h2>
           <p className="text-sm text-muted">Every other device is signed out when you change it.</p>
         </div>

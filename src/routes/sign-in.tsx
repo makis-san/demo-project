@@ -42,7 +42,7 @@ function SignInPage() {
   };
 
   return (
-    <AuthShell title="Sign in to your account" subtitle="Welcome back. Pick up where your last session ended.">
+    <AuthShell title="Sign in">
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && <FormError>{error}</FormError>}
         <div className="space-y-2">

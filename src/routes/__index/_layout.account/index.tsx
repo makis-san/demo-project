@@ -16,7 +16,7 @@ function AccountPage() {
   const { timeZone } = Route.useRouteContext();
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="You" title="Account" />
+      <PageHeader title="Account" />
       <SessionsCard timeZone={timeZone} />
       <PasswordCard />
       <DeleteCard />

@@ -39,7 +39,6 @@ export function SessionsCard({ timeZone }: { timeZone: string }) {
     <Card className="enter enter-1 p-3 sm:p-4">
       <div className="flex flex-wrap items-end justify-between gap-3 px-2 pt-2 pb-4">
         <div className="space-y-1">
-          <p className="eyebrow">Sessions</p>
           <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">
             Where you are signed in
           </h2>

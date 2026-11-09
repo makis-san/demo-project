@@ -44,7 +44,7 @@ Three more problems were still there when I looked again. Two are fixed, and one
 
 ### The current workout downloaded each movement's whole history
 
-For "last time" and the PR badges, the current workout page ran one progression query per movement, each returning every day and workout ever logged. [`getMovementBestsServerFn`](../src/lib/progression.server.ts) replaces them with one query grouped by movement: the top weight of the last day trained, that day, and the best ever. Opening the page with 8 movements, on the load seed:
+For "last time" and the PR badges, the current workout page ran one progression query per movement, each returning every day and workout ever logged. [`getMovementBestsServerFn`](../src/lib/progression.server.ts) replaces them with one query grouped by movement: the top weight of the last day trained, its reps (to prefill the next set), that day, and the best ever. Opening the page with 8 movements, on the load seed:
 
 | User                                      | Before               | After             |
 | ----------------------------------------- | -------------------- | ----------------- |

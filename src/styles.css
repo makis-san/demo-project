@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Setlist: a training log used between sets, often in a dim gym. The look is a dark graphite stage with the
- * logo's three bars lit in the brand red behind frosted glass panels. One family (Archivo, whose width axis gives
- * expanded headings and plain body text), tabular numbers everywhere a weight or count shows.
+ * Setlist: a training log used between sets, often in a dim gym, mostly on a phone. The look is a dark graphite
+ * ground with frosted glass panels, one family (Archivo, whose width axis gives expanded headings and plain body
+ * text) and tabular numbers everywhere a weight or count shows.
  *
  * Palette, built on the brand red (#cc2d00, hue 27 in OKLCH):
  * - primary: the red, for fills. White text on it is 4.8:1.
@@ -12,6 +12,19 @@
  * - ok: teal, the red's complement (hue 195, opposite on the wheel), for "go" and "done": rest over, workout
  *   saved, gains.
  * - Neutrals carry a trace of the red's hue, so the greys sit with it instead of looking brown or blue.
+ *
+ * Rules for every screen, so no two of them are the same template:
+ * - Red is for what you press, the active tab, and records (PRs). It is never a decoration, so the page ground has
+ *   no red glow, only a faint ruled-paper texture.
+ * - Titles are normal-case headings. The page title is text-2xl on a phone and larger from sm up. A line of context
+ *   under it (a date, a start time) is normal case and only there when it says something.
+ * - .eyebrow (small uppercase, spaced) is for a label that names a value and has nothing else to say it: a status
+ *   over a clock, a column head. It is not a heading, and a stat's label is small normal-case muted text.
+ * - One level of surface: a panel (glass) holds its content directly. Rows, fields and steppers sit in it, or on the
+ *   page, separated by spacing and hairlines, not by more boxes.
+ * - Each screen shows its numbers its own way (a week strip, a headline sentence, a one-line row), not one shared
+ *   grid of big numbers over labels.
+ * - No copy that explains the interface. An empty state is one short line and the action.
  */
 @theme {
   --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
@@ -72,7 +85,8 @@
   }
 }
 
-/* The stage behind every screen: the logo's three bars, huge and blurred, on ruled lines like a printed setlist. */
+/* The ground behind every screen: ruled lines like a printed setlist, and a little grain so the blur under the glass
+   doesn't band. No colour blobs. */
 @layer components {
   .stage {
     position: fixed;
@@ -80,9 +94,7 @@
     z-index: -1;
     overflow: hidden;
     pointer-events: none;
-    background:
-      radial-gradient(120% 80% at 100% 0%, oklch(23% 0.04 22 / 0.9), transparent 60%),
-      radial-gradient(80% 60% at 0% 100%, oklch(24% 0.035 200 / 0.55), transparent 60%), var(--color-ground);
+    background: linear-gradient(180deg, oklch(18% 0.008 20), var(--color-ground) 60%);
   }
 
   .stage::before {
@@ -94,51 +106,19 @@
       to bottom,
       transparent 0,
       transparent 39px,
-      oklch(100% 0 0 / 0.035) 39px,
-      oklch(100% 0 0 / 0.035) 40px
+      oklch(100% 0 0 / 0.03) 39px,
+      oklch(100% 0 0 / 0.03) 40px
     );
     mask-image: linear-gradient(to bottom, black, transparent 85%);
   }
 
   .stage::after {
-    /* Grain, so the blur under the glass doesn't band. */
     content: "";
     position: absolute;
     inset: 0;
     opacity: 0.06;
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  .stage__bars {
-    position: absolute;
-    right: -8vw;
-    top: 8vh;
-    display: flex;
-    width: min(78vw, 980px);
-    flex-direction: column;
-    gap: clamp(1.25rem, 3.4vw, 3rem);
-    filter: blur(clamp(6px, 0.9vw, 14px));
-    opacity: 0.34;
-  }
-
-  .stage__bars > span {
-    display: block;
-    height: clamp(3.5rem, 10vw, 9rem);
-    border-radius: 999px;
-    background: linear-gradient(90deg, oklch(55% 0.22 27), oklch(66% 0.19 8));
-  }
-
-  .stage__bars > span:nth-child(1) {
-    width: 100%;
-  }
-  .stage__bars > span:nth-child(2) {
-    width: 70%;
-    opacity: 0.75;
-  }
-  .stage__bars > span:nth-child(3) {
-    width: 40%;
-    opacity: 0.5;
   }
 
   /* Frosted glass. Only panels get the blur; rows inside them use the cheap translucent well. */
@@ -778,5 +758,21 @@
 @media (prefers-reduced-motion: reduce) {
   .orbit-arc.orbit-slot {
     transition: none;
+  }
+}
+
+/*
+ * What the current workout's ring on a phone leaves room for besides the set bar: the top bar, the tabs and the
+ * controls (--ring-chrome), and where the ring's pane starts (--ring-pane-top). A short screen has shorter tabs and no
+ * "Next movement" row, so there the ring gets that height back.
+ */
+:root {
+  --ring-chrome: 17.75rem;
+  --ring-pane-top: 10rem;
+}
+@media (max-height: 700px) {
+  :root {
+    --ring-chrome: 14rem;
+    --ring-pane-top: 9rem;
   }
 }

@@ -132,7 +132,7 @@ export function PresetEditor({ presetId, initial }: { presetId: string | null; i
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={presetId ? "Edit workout" : "New workout"}
+        context={presetId ? "Edit workout" : "New workout"}
         title={draft.name.trim() || "Untitled workout"}
         actions={
           presetId ? (
@@ -148,7 +148,7 @@ export function PresetEditor({ presetId, initial }: { presetId: string | null; i
       />
 
       <Card className="enter enter-1 space-y-2 p-4 sm:p-5">
-        <label htmlFor="workout-name" className="eyebrow">
+        <label htmlFor="workout-name" className="text-sm text-muted">
           Name
         </label>
         <Input
@@ -211,7 +211,7 @@ export function PresetEditor({ presetId, initial }: { presetId: string | null; i
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <label className="eyebrow" htmlFor={`rest-${exercise.key}`}>
+                <label className="text-sm text-muted" htmlFor={`rest-${exercise.key}`}>
                   Rest
                 </label>
                 <Input
@@ -325,11 +325,8 @@ export function PresetEditor({ presetId, initial }: { presetId: string | null; i
 
       <Card className="enter space-y-3 p-4 sm:p-5">
         <div>
-          <p className="eyebrow">Workout of the day</p>
-          <p className="mt-1 text-sm text-muted">
-            Pick the days this workout is planned for. It shows on the home screen on those days. A day can have more
-            than one.
-          </p>
+          <h2 className="text-base font-semibold text-chalk">Workout of the day</h2>
+          <p className="mt-1 text-sm text-muted">Shows on Home on the days you pick.</p>
         </div>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Days of the week">
           {weekdayShort.map((short, i) => {

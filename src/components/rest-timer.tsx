@@ -75,12 +75,15 @@ export function useRestTimer(workoutId: string | null) {
 export type RestTimerState = ReturnType<typeof useRestTimer>;
 
 /** Rest length as a button that cycles through the presets: 0:45, 1:00, 1:30, 2:00, 3:00, off. */
-export function RestLengthButton({ timer }: { timer: RestTimerState }) {
+export function RestLengthButton({ timer, compact = false }: { timer: RestTimerState; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={timer.cycleSeconds}
-      className="press inline-flex h-11 items-center gap-2 rounded-full border border-line bg-white/[0.04] px-4 text-sm text-muted hover:border-line-strong hover:text-chalk">
+      className={cn(
+        "press inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-white/[0.04] px-4 text-sm text-muted hover:border-line-strong hover:text-chalk",
+        compact && "h-12 gap-1.5 px-3.5",
+      )}>
       <Timer className="h-4 w-4 text-accent" />
       <span>
         Rest <span className="num font-semibold text-chalk">{timer.seconds ? formatClock(timer.seconds) : "off"}</span>
@@ -92,7 +95,7 @@ export function RestLengthButton({ timer }: { timer: RestTimerState }) {
 const ring = 2 * Math.PI * 19;
 
 /**
- * The countdown, floating above the dock on a phone and in the corner on a desktop, where a thumb or a glance
+ * The countdown, floating above the set bar on a phone and in the corner on a desktop, where a thumb or a glance
  * finds it between sets. It buzzes the phone when the rest is over, then puts itself away.
  */
 export function RestTimerPill({
@@ -135,8 +138,9 @@ export function RestTimerPill({
   return (
     <div
       className={cn(
-        "glass glass-strong enter fixed inset-x-3 z-30 flex items-center gap-3 rounded-[1.5rem] py-2 pr-2 pl-2.5",
-        "bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+5.25rem)] md:inset-x-auto md:right-6 md:bottom-6 md:w-[22rem]",
+        // On a phone the countdown and its controls are in the ring (the pill would take height from it).
+        "glass glass-strong enter fixed inset-x-3 z-30 flex items-center gap-3 rounded-[1.5rem] py-2 pr-2 pl-2.5 max-md:hidden",
+        "bottom-[calc(var(--composer-h,4.5rem)+0.5rem)] md:inset-x-auto md:right-6 md:bottom-6 md:w-[22rem]",
         over && "border-ok/50",
       )}>
       <div className="relative grid h-12 w-12 shrink-0 place-items-center">
@@ -160,7 +164,7 @@ export function RestTimerPill({
         <Timer className={cn("h-4 w-4", over ? "text-ok" : "text-muted")} aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="eyebrow">{over ? "Rest over" : "Resting"}</p>
+        <p className="text-xs font-medium text-muted">{over ? "Rest over" : "Resting"}</p>
         {over ? (
           <p className="text-lg font-semibold text-ok font-stretch-[112%]">Next set</p>
         ) : (

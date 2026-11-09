@@ -73,12 +73,9 @@ export function TrainingCalendar({ timeZone }: { timeZone: string }) {
     <Card className="enter enter-1 p-5 sm:p-7">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
         <div className="space-y-5 lg:w-56 lg:shrink-0">
-          <div className="space-y-1.5">
-            <p className="eyebrow">Consistency</p>
-            <h2 className="text-lg leading-tight font-semibold tracking-tight text-chalk font-stretch-[112%]">
-              Training calendar
-            </h2>
-          </div>
+          <h2 className="text-lg leading-tight font-semibold tracking-tight text-chalk font-stretch-[112%]">
+            Training calendar
+          </h2>
           <div className="grid grid-cols-3 gap-4 lg:grid-cols-1 lg:gap-5">
             <Stat label="This week" value={perWeek[weeks - 1]} morph />
             <Stat label="Week streak" value={streak} morph />
