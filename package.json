@@ -8,6 +8,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:hash-passwords": "bun scripts/hash-plaintext-passwords.ts",
+    "db:seed-load": "bun scripts/seed-load.ts",
     "build": "vite build",
     "serve": "vite preview",
     "format": "prettier --write .",
