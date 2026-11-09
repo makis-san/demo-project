@@ -17,7 +17,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <section className="enter hidden lg:block" aria-hidden="true">
         <Logo />
         <p className="mt-14 max-w-xl text-[3.25rem] leading-[1.02] font-bold tracking-[-0.025em] font-stretch-[120%] text-chalk">
-          Every set you lift, <span className="text-primary">in the order you lifted it.</span>
+          Every set you lift, <span className="text-accent">in the order you lifted it.</span>
         </p>
         <div className="glass mt-12 max-w-md rounded-panel p-5">
           <div className="mb-4 flex items-baseline justify-between px-1">

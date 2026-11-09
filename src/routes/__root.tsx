@@ -130,7 +130,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         name: "theme-color",
-        content: "#171412",
+        content: "#110c0c",
       },
       {
         title: "Setlist",

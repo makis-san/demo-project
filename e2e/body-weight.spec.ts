@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { addMovement, goTo, logBodyWeight, startWorkout } from "./helpers";
+import { goTo, logBodyWeight, selectMovement, setRows, startWorkout } from "./helpers";
 
 test.describe("Body weight", () => {
   test("should log a body weight and show it in the list and the chart", async ({ page }) => {
@@ -35,14 +35,12 @@ test.describe("Body weight", () => {
   });
 
   test("should default the weight of a body-weight movement to the latest body weight", async ({ page }) => {
-    await addMovement(page, "Pull-up", { bodyWeight: true });
-    await addMovement(page, "Bench Press");
     await logBodyWeight(page, 182);
     await logBodyWeight(page, 181.4);
 
     await startWorkout(page);
     const weight = page.getByLabel("Weight");
-    await page.getByLabel("Movement").selectOption({ label: "Pull-up" });
+    await selectMovement(page, "Pull-Up");
     // The most recent entry, not the first one.
     await expect(weight).toHaveValue("181.4");
 
@@ -50,21 +48,20 @@ test.describe("Body weight", () => {
     await weight.fill("200");
     await page.getByLabel("Reps").fill("5");
     await page.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: "Pull-up" })).toContainText("5 reps × 200 lbs");
+    await expect(setRows(page).filter({ hasText: "Pull-Up" })).toContainText("5 reps × 200 lbs");
 
     // A filled-in body weight does not stay behind on a normal movement.
     await weight.fill("");
-    await page.getByLabel("Movement").selectOption({ label: "Pull-up" });
+    await selectMovement(page, "Pull-Up");
     await expect(weight).toHaveValue("181.4");
-    await page.getByLabel("Movement").selectOption({ label: "Bench Press" });
+    await selectMovement(page, "Bench Press");
     await expect(weight).toHaveValue("");
   });
 
   test("should leave the weight empty and say why when there is no body weight yet", async ({ page }) => {
-    await addMovement(page, "Pull-up", { bodyWeight: true });
     await startWorkout(page);
 
-    await page.getByLabel("Movement").selectOption({ label: "Pull-up" });
+    await selectMovement(page, "Pull-Up");
 
     await expect(page.getByLabel("Weight")).toHaveValue("");
     await expect(page.getByText("No body weight recorded yet")).toBeVisible();

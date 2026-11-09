@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { seedCompletedWorkouts, type SeedWorkout } from "./db";
-import { addMovement, completeWorkout, goTo } from "./helpers";
+import { completeWorkout, goTo } from "./helpers";
 
 // One page of history is 20 workouts.
 const pageSize = 20;
@@ -140,7 +140,6 @@ test.describe("Workout history paging", () => {
 
   test("should show a workout completed now at the top, with older pages already loaded", async ({ page, user }) => {
     // The movement is added in the page, which a movement made in the database behind its back would not be.
-    await addMovement(page, "Bench Press");
     // 2 to 26 sets, so the workout completed below, with 1 set, is told apart.
     await seedCompletedWorkouts(user.email, workoutsNewestFirst(25, 2));
     await goTo(page, "Workout History");

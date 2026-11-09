@@ -28,7 +28,7 @@ async function sessionCookie(page: Page) {
 async function signedInPage(freshPage: () => Promise<Page>, user: TestUser) {
   const page = await freshPage();
   await submitSignIn(page, user.email, user.password);
-  await expect(page).toHaveURL(/\/current-workout/);
+  await expect(page).toHaveURL(/\/home/);
   return page;
 }
 
@@ -58,7 +58,7 @@ test.describe("Email addresses", () => {
 
     const page = await freshPage();
     await submitSignIn(page, user.email.toUpperCase(), user.password);
-    await expect(page).toHaveURL(/\/current-workout/);
+    await expect(page).toHaveURL(/\/home/);
     await expect(page.getByText(user.name)).toBeVisible();
   });
 });
@@ -127,7 +127,7 @@ test.describe("Sessions", () => {
     const user = await createUser(freshPage);
     const page = await signedInPage(freshPage, user);
     await page.reload();
-    await expect(page).toHaveURL(/\/current-workout/);
+    await expect(page).toHaveURL(/\/home/);
 
     // The cookie is still in the browser. Only the stored expiry changes.
     const { count } = await getDb().session.updateMany({
@@ -195,7 +195,7 @@ test.describe("Sessions", () => {
     await expect(laptop).toHaveURL(/\/sign-in/);
 
     await phone.reload();
-    await expect(phone).toHaveURL(/\/current-workout/);
+    await expect(phone).toHaveURL(/\/home/);
   });
 
   test("should store only a hash of the token", async ({ freshPage }) => {
@@ -238,8 +238,8 @@ test.describe("Sessions", () => {
       if (req.url().includes("/_serverFn/") && req.method() === "GET") urls.push(req.url());
     });
     await submitSignIn(page, user.email, user.password);
-    await expect(page).toHaveURL(/\/current-workout/);
-    await expect(page.getByRole("heading", { level: 1, name: "Current Workout" })).toBeVisible();
+    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
     expect(urls.length).toBeGreaterThan(0);
 
     const headers = { "x-tsr-serverfn": "true" };

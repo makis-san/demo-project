@@ -7,7 +7,7 @@ export const fieldClass = cn(
   "flex h-12 w-full rounded-field border border-line bg-black/25 px-4 text-[15px] text-chalk",
   "transition-[border-color,box-shadow,background-color] duration-150",
   "placeholder:text-faint hover:border-line-strong",
-  "focus-visible:outline-none focus-visible:border-primary focus-visible:bg-black/35 focus-visible:shadow-[0_0_0_3px_oklch(68%_0.19_40/0.22)]",
+  "focus-visible:outline-none focus-visible:border-primary focus-visible:bg-black/35 focus-visible:shadow-[0_0_0_3px_oklch(58%_0.215_27/0.3)]",
   "disabled:cursor-not-allowed disabled:opacity-50",
 );
 

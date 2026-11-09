@@ -33,7 +33,7 @@ export async function signUp(page: Page, user: TestUser) {
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/current-workout/);
+  await expect(page).toHaveURL(/\/home/);
   await waitForHydration(page);
 }
 

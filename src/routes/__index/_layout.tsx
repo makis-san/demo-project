@@ -1,5 +1,5 @@
-import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Dumbbell, History, BicepsFlexed, Scale, LogOut } from "lucide-react";
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { logoutServerFn } from "@/lib/auth.server";
 import { Logo } from "@/components/logo";
@@ -15,9 +15,12 @@ export const Route = createFileRoute("/__index/_layout")({
 // `short` is what fits under the icon in the phone's dock. The link is still named by `label`, as hidden text
 // rather than aria-label, so getByLabel("Weight") style lookups don't also match the Body Weight link.
 const navItems = [
-  { to: "/current-workout", label: "Current Workout", short: "Workout", icon: Dumbbell },
+  { to: "/home", label: "Home", short: "Home", icon: House },
+  // The Start screen is where a workout begins, so it lights the same tab as the workout itself.
+  { to: "/current-workout", also: "/start-workout", label: "Current Workout", short: "Workout", icon: Dumbbell },
+  { to: "/workout-library", label: "Workout Library", short: "Library", icon: Library },
   { to: "/workout-history", label: "Workout History", short: "History", icon: History },
-  { to: "/movements", label: "Movements", short: "Movements", icon: BicepsFlexed },
+  { to: "/movements", label: "Movements", short: "Moves", icon: BicepsFlexed },
   { to: "/body-weight", label: "Body Weight", short: "Weight", icon: Scale },
 ] as const;
 
@@ -25,8 +28,8 @@ const navItems = [
 // without a prefix are the phone, the md: ones are the sidebar.
 const navItemClass =
   "press group relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[11px] font-medium text-faint hover:text-chalk " +
-  "[&.active]:text-chalk [&.active]:bg-white/[0.08] " +
-  "md:flex-none md:flex-row md:justify-start md:gap-3 md:px-3.5 md:py-3 md:text-sm";
+  "[&.active]:text-chalk " +
+  "md:h-11 md:flex-none md:flex-row md:justify-start md:gap-3 md:px-3.5 md:py-0 md:text-sm";
 
 function LogoutButton() {
   const logoutMutation = useMutation({
@@ -50,6 +53,10 @@ function LogoutButton() {
 function RouteComponent() {
   const { user } = Route.useRouteContext();
   const displayName = user.name || user.email;
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const activeIndex = navItems.findIndex(
+    (item) => pathname.startsWith(item.to) || ("also" in item && pathname.startsWith(item.also)),
+  );
   return (
     <div className="min-h-dvh md:flex md:gap-6 md:p-4">
       <nav
@@ -59,14 +66,20 @@ function RouteComponent() {
           <Logo />
         </Link>
         <p className="eyebrow mb-3 hidden px-3.5 md:block">Train</p>
-        <div className="flex flex-[4] gap-1 md:flex-1 md:flex-col">
+        <div className="relative flex flex-[6] md:flex-1 md:flex-col">
+          {/* One highlight that slides to the page you open. The links are all the same size, so the page's
+              position in the list is all it needs: across the dock on a phone, down the sidebar from md up. */}
+          {activeIndex >= 0 && (
+            <span
+              aria-hidden="true"
+              style={{ "--i": activeIndex, "--n": navItems.length } as React.CSSProperties}
+              className="pointer-events-none absolute inset-y-0 left-0 w-[calc(100%/var(--n))] translate-x-[calc(var(--i)*100%)] rounded-2xl bg-white/[0.08] transition-transform duration-[380ms] ease-[var(--ease-enter)] motion-reduce:transition-none md:inset-x-0 md:top-0 md:bottom-auto md:h-11 md:w-full md:translate-x-0 md:translate-y-[calc(var(--i)*100%)]">
+              <span className="absolute top-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary md:top-1/2 md:left-0 md:h-5 md:w-[3px] md:translate-x-0 md:-translate-y-1/2" />
+            </span>
+          )}
           {navItems.map(({ to, label, short, icon: Icon }) => (
             <Link key={to} to={to} className={navItemClass}>
-              <span
-                aria-hidden="true"
-                className="absolute top-1 h-1 w-1 rounded-full bg-primary opacity-0 group-[.active]:opacity-100 md:top-1/2 md:left-0 md:h-5 md:w-[3px] md:-translate-y-1/2"
-              />
-              <Icon className="h-[18px] w-[18px] group-[.active]:text-primary" />
+              <Icon className="h-[18px] w-[18px] group-[.active]:text-accent" />
               <span aria-hidden="true" className="md:hidden">
                 {short}
               </span>
@@ -79,7 +92,7 @@ function RouteComponent() {
           <div className="hidden items-center gap-3 px-2 py-2 md:flex">
             <span
               aria-hidden="true"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary uppercase">
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-accent uppercase">
               {displayName.charAt(0)}
             </span>
             <div className="min-w-0">

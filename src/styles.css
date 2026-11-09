@@ -1,30 +1,38 @@
 @import "tailwindcss";
 
 /*
- * Setlist: a training log used between sets, often in a dim gym. The look is a warm graphite stage with the
- * logo's three bars lit in ember behind frosted glass panels. One accent (ember), one family (Archivo, whose
- * width axis gives expanded headings and plain body text), tabular numbers everywhere a weight or count shows.
+ * Setlist: a training log used between sets, often in a dim gym. The look is a dark graphite stage with the
+ * logo's three bars lit in the brand red behind frosted glass panels. One family (Archivo, whose width axis gives
+ * expanded headings and plain body text), tabular numbers everywhere a weight or count shows.
+ *
+ * Palette, built on the brand red (#cc2d00, hue 27 in OKLCH):
+ * - primary: the red, for fills. White text on it is 4.8:1.
+ * - accent: the same red lifted toward pink, for red text and icons on the dark ground (7.9:1). The plain red
+ *   is only 4:1 there, too low for small text.
+ * - ok: teal, the red's complement (hue 195, opposite on the wheel), for "go" and "done": rest over, workout
+ *   saved, gains.
+ * - Neutrals carry a trace of the red's hue, so the greys sit with it instead of looking brown or blue.
  */
 @theme {
   --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
 
-  /* Ember: the brand red-orange, lifted so it reads on a dark ground. Text on it is ink, not white. */
-  --color-primary: oklch(68% 0.19 40);
-  --color-primary-strong: oklch(74% 0.17 45);
-  --color-primary-ink: oklch(20% 0.04 40);
+  --color-primary: oklch(58% 0.215 27);
+  --color-primary-strong: oklch(62% 0.21 25);
+  --color-primary-ink: oklch(99% 0.004 20);
+  --color-accent: oklch(74% 0.15 15);
 
-  /* Warm graphite neutrals, from the page ground up to chalk text. */
-  --color-ground: oklch(16% 0.006 60);
-  --color-raised: oklch(21% 0.007 60);
-  --color-chalk: oklch(95% 0.01 80);
-  --color-muted: oklch(74% 0.012 75);
-  --color-faint: oklch(58% 0.012 70);
+  /* Graphite neutrals with a trace of the red, from the page ground up to chalk text. */
+  --color-ground: oklch(16% 0.008 20);
+  --color-raised: oklch(21% 0.009 20);
+  --color-chalk: oklch(96% 0.006 20);
+  --color-muted: oklch(75% 0.012 20);
+  --color-faint: oklch(61% 0.012 20);
   --color-line: oklch(100% 0 0 / 0.09);
   --color-line-strong: oklch(100% 0 0 / 0.16);
   --color-well: oklch(100% 0 0 / 0.045);
 
-  --color-danger: oklch(70% 0.17 18);
-  --color-ok: oklch(82% 0.13 150);
+  --color-danger: oklch(70% 0.18 18);
+  --color-ok: oklch(80% 0.11 195);
 
   --radius-panel: 1.75rem;
   --radius-field: 0.875rem;
@@ -55,7 +63,7 @@
   }
 
   ::selection {
-    background: oklch(68% 0.19 40 / 0.35);
+    background: oklch(58% 0.215 27 / 0.4);
   }
 
   :focus-visible {
@@ -73,8 +81,8 @@
     overflow: hidden;
     pointer-events: none;
     background:
-      radial-gradient(120% 80% at 100% 0%, oklch(24% 0.03 50 / 0.9), transparent 60%),
-      radial-gradient(90% 70% at 0% 100%, oklch(20% 0.02 45 / 0.9), transparent 55%), var(--color-ground);
+      radial-gradient(120% 80% at 100% 0%, oklch(23% 0.04 22 / 0.9), transparent 60%),
+      radial-gradient(80% 60% at 0% 100%, oklch(24% 0.035 200 / 0.55), transparent 60%), var(--color-ground);
   }
 
   .stage::before {
@@ -118,7 +126,7 @@
     display: block;
     height: clamp(3.5rem, 10vw, 9rem);
     border-radius: 999px;
-    background: linear-gradient(90deg, oklch(62% 0.2 38), oklch(70% 0.17 55));
+    background: linear-gradient(90deg, oklch(55% 0.22 27), oklch(66% 0.19 8));
   }
 
   .stage__bars > span:nth-child(1) {
@@ -136,7 +144,7 @@
   /* Frosted glass. Only panels get the blur; rows inside them use the cheap translucent well. */
   .glass {
     position: relative;
-    background: linear-gradient(180deg, oklch(26% 0.008 60 / 0.62), oklch(20% 0.007 60 / 0.5));
+    background: linear-gradient(180deg, oklch(26% 0.01 20 / 0.62), oklch(20% 0.009 20 / 0.5));
     backdrop-filter: blur(22px) saturate(150%);
     -webkit-backdrop-filter: blur(22px) saturate(150%);
     border: 1px solid var(--color-line);
@@ -146,7 +154,7 @@
   }
 
   .glass-strong {
-    background: linear-gradient(180deg, oklch(24% 0.008 60 / 0.82), oklch(18% 0.007 60 / 0.78));
+    background: linear-gradient(180deg, oklch(24% 0.01 20 / 0.82), oklch(18% 0.009 20 / 0.78));
   }
 
   /* A numbered list, like the songs on a setlist. Counters stay out of the text, so a row reads as its content. */
@@ -168,10 +176,48 @@
 
   .select-chevron {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a59e94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23b5abab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
     background-size: 16px;
     background-position: right 1rem center;
     background-repeat: no-repeat;
+  }
+
+  /* A checkbox drawn as a switch. It stays a real checkbox, so it reads and works as one. */
+  .switch {
+    appearance: none;
+    position: relative;
+    width: 2.75rem;
+    height: 1.625rem;
+    border-radius: 999px;
+    background: oklch(100% 0 0 / 0.1);
+    border: 1px solid var(--color-line-strong);
+    cursor: pointer;
+    transition: background-color 180ms var(--ease-out-soft);
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    background: var(--color-chalk);
+    transition: transform 180ms var(--ease-out-soft);
+  }
+  .switch:checked {
+    background: var(--color-primary);
+    border-color: transparent;
+  }
+  .switch:checked::after {
+    transform: translateX(1.125rem);
+    background: var(--color-primary-ink);
+  }
+  .switch:active::after {
+    width: 1.5rem;
+  }
+  .switch:checked:active::after {
+    transform: translateX(0.875rem);
   }
 
   .num {
@@ -186,6 +232,252 @@
     text-transform: uppercase;
     font-stretch: 112%;
     color: var(--color-faint);
+  }
+}
+
+/*
+ * The movement figure and the body maps. The side view is plain SVG, so these classes style the parts that are
+ * drawn: muscles, the range ghost, the bar path and the gear. Colour of a muscle is set from script as it works.
+ */
+@layer components {
+  .figure-stage {
+    --fg-hot: #e0262a;
+    --fg-steel: oklch(72% 0.01 250);
+    --fg-steel-dim: oklch(30% 0.008 250);
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 3.3;
+    max-width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: 1.375rem;
+    background: radial-gradient(120% 90% at 50% 25%, oklch(19% 0.01 20), oklch(13% 0.008 20));
+  }
+  .figure-stage > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .figure-phase {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem 0.375rem 0.625rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line-strong);
+    background: oklch(16% 0.008 20 / 0.82);
+    backdrop-filter: blur(6px);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .figure-phase i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--color-faint);
+    transition:
+      background 250ms,
+      box-shadow 250ms;
+  }
+  .figure-phase[data-phase="conc"] i {
+    background: var(--fg-hot);
+    box-shadow: 0 0 10px var(--fg-hot);
+  }
+  .figure-phase[data-phase="ecc"] i {
+    background: var(--color-accent);
+  }
+  .figure-rep {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.875rem;
+    padding-top: 0.4375rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .figure-angles {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.625rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .figure-angles span {
+    padding: 0.25rem 0.5625rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-line);
+    background: oklch(16% 0.008 20 / 0.8);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+  .figure-angles b {
+    font-weight: 700;
+    color: var(--color-chalk);
+  }
+
+  .fg-mp {
+    stroke: oklch(13% 0.008 20);
+    stroke-width: 0.45;
+    stroke-linejoin: round;
+  }
+  .fg-fib {
+    fill: none;
+    stroke: oklch(10% 0.008 20 / 0.55);
+    stroke-width: 0.32;
+    stroke-linecap: round;
+  }
+  .fg-ghost {
+    fill: none;
+    stroke: oklch(100% 0 0 / 0.09);
+    stroke-width: 0.6;
+  }
+  .fg-trail {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 1.1;
+    stroke-dasharray: 2.2 2.2;
+    opacity: 0.75;
+  }
+  .fg-trail-end {
+    fill: var(--color-accent);
+    opacity: 0.8;
+  }
+  .fg-eq {
+    fill: var(--fg-steel);
+  }
+  .fg-eq-dim {
+    fill: var(--fg-steel-dim);
+  }
+  .fg-pad {
+    fill: oklch(24% 0.012 20);
+  }
+  .fg-plate {
+    fill: oklch(30% 0.01 250 / 0.35);
+    stroke: var(--fg-steel);
+    stroke-width: 1.3;
+  }
+  .fg-floor {
+    stroke: var(--color-line-strong);
+    stroke-width: 1.2;
+  }
+
+  /* Front and back maps: every muscle group is tinted by --i, 0 (resting) to 1 (hot). */
+  .body-map {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem;
+    padding: 0.625rem 0.375rem 0.125rem;
+    border: 1px solid var(--color-line);
+    border-radius: 1.125rem;
+    background: oklch(13% 0.008 20);
+  }
+  .body-map figure {
+    margin: 0;
+    text-align: center;
+  }
+  .body-map svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 230px;
+  }
+  .body-map figcaption {
+    padding-bottom: 0.375rem;
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+  .body-map .sil,
+  .body-thumb .sil {
+    fill: oklch(24% 0.008 20);
+  }
+  .body-map .m,
+  .body-thumb .m {
+    --i: 0;
+    fill: color-mix(in oklch, oklch(36% 0.012 20), #e0262a calc(var(--i) * 100%));
+    stroke: oklch(13% 0.008 20);
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+    transition: fill 300ms ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .body-map .m,
+  .figure-phase i {
+    transition: none;
+  }
+}
+
+/* The body-part image on a movement card: a zoomed piece of the map, lit where the movement works. */
+.body-thumb {
+  display: block;
+  background: oklch(13% 0.008 20);
+}
+
+/* The movement sheet: it rises from the bottom edge on a phone and pops in at the middle of a desktop. */
+@layer utilities {
+  .sheet-backdrop {
+    animation: fade-in 200ms ease-out both;
+  }
+  .sheet {
+    animation: sheet-up 340ms var(--ease-enter) both;
+  }
+  @media (min-width: 40rem) {
+    .sheet {
+      animation: pop-in 260ms var(--ease-enter) both;
+    }
+  }
+}
+
+/* The numbers of the start countdown: each one pops in big, settles, and fades as the next arrives. */
+.count-pop {
+  animation: count-pop 750ms var(--ease-enter) both;
+}
+@keyframes count-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .count-pop {
+    animation: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
   }
 }
 
@@ -235,7 +527,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .enter {
+  .enter,
+  .sheet,
+  .sheet-backdrop {
     animation: none;
   }
   .press,
@@ -247,7 +541,7 @@
 
 /* Toasts as small glass slips, top right. The class names are react-toastify's. */
 :root {
-  --toastify-color-dark: oklch(22% 0.008 60 / 0.92);
+  --toastify-color-dark: oklch(22% 0.01 20 / 0.92);
   --toastify-font-family: var(--font-sans);
   --toastify-text-color-dark: var(--color-chalk);
   --toastify-color-error: var(--color-danger);
@@ -262,4 +556,227 @@
   -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 18px 40px -18px oklch(0% 0 0 / 0.7);
   font-size: 0.875rem;
+}
+
+/*
+ * The workout ring. Arcs take their length from CSS variables, so they glide from one second to the next, and
+ * @starting-style grows each new arc out of nothing: the ring blooms on load, and a new section grows from the head.
+ */
+.orbit-arc {
+  stroke-dasharray: var(--dash);
+  stroke-dashoffset: var(--offset);
+  transition:
+    stroke-dasharray 1s linear,
+    stroke-dashoffset 1s linear,
+    stroke-width 400ms var(--ease-out-soft),
+    opacity 400ms ease;
+}
+@starting-style {
+  .orbit-arc {
+    stroke-dasharray: 0 100;
+  }
+}
+.orbit-enter {
+  animation: orbit-enter 900ms var(--ease-enter) both;
+}
+@keyframes orbit-enter {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.9);
+  }
+}
+/* The head turns along the ring each second, keeping pace with the current arc. It is drawn at the top and rotated, so
+   it follows the ring instead of cutting across it. */
+.orbit-head {
+  transform-origin: 60px 60px;
+  transition: transform 1s linear;
+}
+/* For a moment after the movement changes, the arcs and the head move quickly together, so the head rides the new arc
+   as it grows and lands with the burst. The inner ring's sets keep their own timing (.orbit-slot, below). Keep the
+   duration in step with JUMP_MS in -workout-ring.tsx. */
+.orbit-jump .orbit-arc,
+.orbit-jump .orbit-head {
+  transition-duration: 550ms;
+  transition-timing-function: var(--ease-out-soft);
+}
+/* A soft glow under the current arc that breathes while the clock runs. */
+.orbit-glow {
+  filter: blur(3px);
+  animation: ring-breathe 2.4s ease-in-out infinite;
+}
+@keyframes ring-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+/* A ring that spreads from the head, like a sonar ping, to say the clock is running. */
+.orbit-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbit-ping 2s var(--ease-out-soft) infinite;
+}
+@keyframes orbit-ping {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+/* A set pip or a break line arriving on the ring. */
+.orbit-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbit-pop 480ms var(--ease-enter) both;
+}
+@keyframes orbit-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* Text in the middle that changes (the movement, the set, Paused) slides in instead of snapping. */
+.orbit-swap {
+  animation: orbit-swap 420ms var(--ease-enter) both;
+}
+@keyframes orbit-swap {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+    filter: blur(4px);
+  }
+}
+/* A paused clock breathes, like a stopwatch on hold. */
+.clock-hold {
+  animation: clock-hold 1.6s ease-in-out infinite;
+}
+@keyframes clock-hold {
+  50% {
+    opacity: 0.35;
+  }
+}
+.icon-in {
+  animation: icon-in 320ms var(--ease-enter) both;
+}
+@keyframes icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.4);
+  }
+}
+/* Next glows when every planned set of the current movement is done: time to move on. */
+.next-ready {
+  animation: next-ready 1.8s ease-in-out infinite;
+}
+@keyframes next-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(80% 0.11 195 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px oklch(80% 0.11 195 / 0.28);
+  }
+}
+/* The Pause button sends out a slow ring while paused, so the state is clear from across the room. */
+.pause-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--color-primary);
+  animation: pause-halo 1.8s var(--ease-out-soft) infinite;
+}
+@keyframes pause-halo {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* The swipeable panes of the current workout on a phone: the scrollbar is hidden, the swipe is the control. */
+.swipe-panes {
+  scrollbar-width: none;
+}
+.swipe-panes::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Finish is a chequered flag. A soft band of shade crosses the squares while the button is hovered or focused, like
+ * cloth waving, and holds still otherwise.
+ */
+.checkered {
+  background-image: repeating-conic-gradient(oklch(92% 0.006 20) 0 25%, oklch(15% 0.008 20) 0 50%);
+  background-size: 14px 14px;
+}
+.checkered::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    oklch(0% 0 0 / 0.45) 35%,
+    transparent 50%,
+    oklch(100% 0 0 / 0.14) 65%,
+    transparent 85%
+  );
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  animation: flag-wave 1.6s linear infinite paused;
+}
+.flag-button:hover .checkered::after,
+.flag-button:focus-visible .checkered::after {
+  animation-play-state: running;
+}
+@keyframes flag-wave {
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arc,
+  .orbit-head {
+    transition: none;
+  }
+  .checkered::after,
+  .orbit-enter,
+  .orbit-glow,
+  .orbit-ping,
+  .orbit-pop,
+  .orbit-swap,
+  .clock-hold,
+  .icon-in,
+  .next-ready,
+  .pause-halo::after {
+    animation: none;
+  }
+}
+
+/* A set segment on the inner ring lights up when its set is logged, and the segments ease to new places. */
+.orbit-arc.orbit-slot {
+  transition:
+    stroke-dasharray 600ms var(--ease-enter),
+    stroke-dashoffset 600ms var(--ease-enter),
+    stroke-opacity 500ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arc.orbit-slot {
+    transition: none;
+  }
 }

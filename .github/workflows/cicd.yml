@@ -41,7 +41,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs on one worker and takes about 19 minutes, so 20 left no room for a slower runner.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -76,6 +77,9 @@ jobs:
         run: bunx playwright install --with-deps chromium
       - name: Apply migrations
         run: bunx prisma migrate deploy
+      # The built-in movements are rows written from the catalog in code, so the tests need them.
+      - name: Seed the built-in movements
+        run: bun scripts/seed-movements.ts
       # The same command the Docker image runs. Playwright's config expects the app on port 3000.
       - name: Start the app
         run: |
