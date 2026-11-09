@@ -77,7 +77,6 @@ function StartWorkoutPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={preview.kind === "preset" ? "Workout" : "Before you start"}
         title={preview.title}
         actions={
           preview.kind === "preset" && search.preset ? (

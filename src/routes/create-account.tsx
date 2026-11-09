@@ -44,7 +44,7 @@ function CreateAccountPage() {
   };
 
   return (
-    <AuthShell title="Create your account" subtitle="Set up your log, then add the movements you train.">
+    <AuthShell title="Create account">
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && <FormError>{error}</FormError>}
         <div className="space-y-2">

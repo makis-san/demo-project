@@ -11,7 +11,7 @@ const previewSets = [
 const previewVolume = previewSets.reduce((sum, set) => sum + set.reps * set.weight, 0);
 
 /** The signed-out screens: the product on the left from lg up, the form on a glass panel on the right. */
-export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+export function AuthShell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="mx-auto grid min-h-dvh w-full max-w-6xl items-center gap-12 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:px-8">
       <section className="enter hidden lg:block" aria-hidden="true">
@@ -21,7 +21,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
         </p>
         <div className="glass mt-12 max-w-md rounded-panel p-5">
           <div className="mb-4 flex items-baseline justify-between px-1">
-            <p className="eyebrow">Tonight · Lower</p>
+            <p className="text-sm font-semibold text-muted">Tonight · Lower</p>
             <p className="num text-xs text-faint">
               {previewSets.length} sets · {previewVolume.toLocaleString("en-US")} lbs
             </p>
@@ -49,7 +49,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
             <h1 className="text-[1.75rem] leading-tight font-bold tracking-tight font-stretch-[115%] text-chalk">
               {title}
             </h1>
-            <p className="text-sm text-muted">{subtitle}</p>
+            {subtitle && <p className="text-sm text-muted">{subtitle}</p>}
           </div>
           {children}
         </div>
@@ -60,7 +60,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 
 export function FieldLabel({ htmlFor, children }: { htmlFor: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="eyebrow block text-muted">
+    <label htmlFor={htmlFor} className="block text-sm font-medium text-muted">
       {children}
     </label>
   );

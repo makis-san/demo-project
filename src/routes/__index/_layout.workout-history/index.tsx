@@ -110,7 +110,7 @@ function WorkoutHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Review" title="Workout History" />
+      <PageHeader title="Workout History" />
 
       <TrainingCalendar timeZone={timeZone} />
 
@@ -127,10 +127,7 @@ function WorkoutHistoryPage() {
 
       <Card className="enter enter-2">
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1.5">
-            <p className="eyebrow">Log</p>
-            <CardTitle>Completed Workouts</CardTitle>
-          </div>
+          <CardTitle>Completed Workouts</CardTitle>
           <Button size="sm" variant="destructive" onClick={handleDeleteSelected} disabled={selectedWorkouts.size === 0}>
             <Trash2 className="h-4 w-4" />
             {deleteWorkoutsMutation.isPending ? "Deleting..." : `Delete Selected (${selectedWorkouts.size})`}

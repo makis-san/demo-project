@@ -20,7 +20,6 @@ function WorkoutLibraryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Library"
         title="Workout Library"
         actions={
           <Link to="/workout-library/new" search={{ movements: undefined }} className={buttonClasses()}>

@@ -133,7 +133,6 @@ function MovementsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Library"
         title="Movements"
         actions={
           <a href="#create-movement" className="text-sm font-semibold text-accent underline-offset-4 hover:underline">

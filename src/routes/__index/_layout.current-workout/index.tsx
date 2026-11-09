@@ -287,7 +287,7 @@ function CurrentWorkoutPage() {
     return (
       <div className="space-y-6">
         {confetti}
-        <PageHeader eyebrow="Today" title="Current Workout" />
+        <PageHeader title="Current Workout" />
         {recap && <RecapCard recap={recap} onDismiss={() => setRecap(null)} />}
         <Card className="enter enter-1 overflow-hidden">
           <div className="relative flex flex-col items-start gap-6 p-7 sm:p-10">
@@ -355,7 +355,8 @@ function CurrentWorkoutPage() {
     setEnded(true);
   };
   const goNext = () => {
-    if (nextGroup) handleMovementChange(nextGroup.movement, { reveal: false }); else if (groups.length > 0) endPlan();
+    if (nextGroup) handleMovementChange(nextGroup.movement, { reveal: false });
+    else if (groups.length > 0) endPlan();
     else setChoosing(true);
   };
   const names = new Map<string, string>();
@@ -413,7 +414,7 @@ function CurrentWorkoutPage() {
     <div className={timer.rest ? "space-y-6 pb-24 md:pb-0" : "space-y-6"}>
       {confetti}
       <PageHeader
-        eyebrow={`In progress · started ${formatTime(workout.startedAt, timeZone)}`}
+        context={`In progress · started ${formatTime(workout.startedAt, timeZone)}`}
         title="Current Workout"
         nowrap
         actions={

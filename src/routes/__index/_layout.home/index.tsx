@@ -54,7 +54,7 @@ function HomePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={formatDate(`${calendar.today}T12:00:00Z`, "UTC", { weekday: "long", month: "long", day: "numeric" })}
+        context={formatDate(`${calendar.today}T12:00:00Z`, "UTC", { weekday: "long", month: "long", day: "numeric" })}
         title="Home"
       />
 

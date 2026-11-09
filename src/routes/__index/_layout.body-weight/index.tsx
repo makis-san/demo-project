@@ -88,7 +88,7 @@ function BodyWeightPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Track" title="Body Weight" />
+      <PageHeader title="Body Weight" />
 
       <Card className="enter enter-1 p-3 sm:p-4">
         <form onSubmit={handleSubmit} className="space-y-3">
