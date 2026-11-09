@@ -335,6 +335,7 @@ export const getWorkoutHistoryServerFn = createServerFn()
       orderBy: [{ completedAt: "desc" }, { id: "desc" }],
       take: historyPageSize + 1,
       include: {
+        preset: { select: { name: true } },
         sets: {
           include: { movement: true },
           orderBy: setOrder,
@@ -343,8 +344,9 @@ export const getWorkoutHistoryServerFn = createServerFn()
     });
 
     const hasMore = rows.length > historyPageSize;
-    const workouts = rows.slice(0, historyPageSize).map((workout) => ({
+    const workouts = rows.slice(0, historyPageSize).map(({ preset, ...workout }) => ({
       ...workout,
+      presetName: preset?.name ?? null,
       sets: workout.sets.map(withNumberWeight),
     }));
     const last = workouts.at(-1);
