@@ -19,3 +19,8 @@ export const getServerSidePrismaClient = async () => {
 export function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
+
+/** True for Prisma's P2003 error: a foreign key refused the write, for example deleting a row that another row points at. */
+export function isForeignKeyViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2003";
+}

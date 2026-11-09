@@ -81,6 +81,9 @@ model Movement {
   secondaryMuscles MuscleGroup[]    @default([])
   sets             Set[]
   presetExercises  PresetExercise[]
+  // Set when the owner deletes a movement that is in a set or a preset. It is hidden from the library and the pickers
+  // but kept, so history, charts and presets that use it stay whole. Always null for a built-in.
+  archivedAt       DateTime?
 
   // Postgres treats nulls as different, so this stops duplicate names among a user's own movements only.
   // Built-in names are kept unique by a partial index in the movement_library migration, which Prisma cannot express.
