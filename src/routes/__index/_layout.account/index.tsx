@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
+import { DeleteCard } from "./-delete-card";
+import { PasswordCard } from "./-password-card";
 import { sessionsQueryOptions } from "./-queries/account";
 import { SessionsCard } from "./-sessions-card";
 
@@ -16,6 +18,8 @@ function AccountPage() {
     <div className="space-y-6">
       <PageHeader eyebrow="You" title="Account" />
       <SessionsCard timeZone={timeZone} />
+      <PasswordCard />
+      <DeleteCard />
     </div>
   );
 }

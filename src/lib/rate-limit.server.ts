@@ -1,7 +1,7 @@
 import { getRequestHeader, getRequestIP } from "@tanstack/react-start/server";
 
 /**
- * Limits on sign-in and sign-up attempts, kept in this process's memory.
+ * Limits on sign-in and sign-up attempts, and on the password checks of the Account page, kept in this process's memory.
  *
  * What this does not cover:
  * - A restart forgets every counter.
