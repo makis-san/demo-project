@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Morph } from "@/components/morph";
 import { cn } from "@/lib/utils";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { buttonClasses } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { LibrarySwitch } from "@/components/library-switch";
+import { FilterControls, FilterSheet, activeFilterCount, type FilterState, type ShowFilter } from "./-filter-sheet";
 import { createMovementServerFn } from "@/lib/movements.server";
 import { Card } from "@/components/ui/card";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { movementsQueryKey, movementsQueryOptions } from "./-queries/movements";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { PageHeader } from "@/components/page-header";
 import { MusclePicker, type MuscleSelection } from "@/components/muscle-picker";
@@ -33,18 +34,17 @@ export const Route = createFileRoute("/__index/_layout/movements/")({
   component: MovementsPage,
 });
 
-type Filter = "all" | "weighted" | "bodyWeight";
-
 function MovementsPage() {
   const queryClient = useQueryClient();
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<ShowFilter>("all");
   const [category, setCategory] = useState<MovementCategory | null>(null);
   // The movements ticked on their cards, in the order they were ticked, to build a workout from.
   const [picked, setPicked] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<Equipment | "">("");
   const [mineOnly, setMineOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // The form for a custom movement.
   const [name, setName] = useState("");
@@ -130,8 +130,17 @@ function MovementsPage() {
   const togglePicked = (id: string) =>
     setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  const filterState: FilterState = { equipment, show: filter, mineOnly };
+  const changeFilters = (next: Partial<FilterState>) => {
+    if (next.equipment !== undefined) setEquipment(next.equipment);
+    if (next.show !== undefined) setFilter(next.show);
+    if (next.mineOnly !== undefined) setMineOnly(next.mineOnly);
+  };
+  const activeFilters = activeFilterCount(filterState);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      <LibrarySwitch current="movements" />
       <PageHeader
         title="Movements"
         actions={
@@ -141,7 +150,7 @@ function MovementsPage() {
         }
       />
 
-      <Card className="enter enter-1 space-y-3 p-3 sm:p-4">
+      <div className="enter enter-1 space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-faint" />
           <Input
@@ -149,76 +158,66 @@ function MovementsPage() {
             placeholder="Search the library"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-14 rounded-2xl pl-12 text-base"
+            className="h-12 rounded-2xl pl-12 text-base"
             autoComplete="off"
           />
         </div>
         <CategoryTabs value={category} onChange={setCategory} counts={tabCounts} />
-        <Select
-          aria-label="Filter by equipment"
-          value={equipment}
-          onChange={(e) => setEquipment(e.target.value as Equipment | "")}>
-          <option value="">Any equipment</option>
-          {equipmentTypes.map((e) => (
-            <option key={e} value={e}>
-              {equipmentLabels[e]}
-            </option>
-          ))}
-        </Select>
-        <p className="num min-h-5 px-2 text-xs text-faint" aria-live="polite">
-          {filtering
-            ? shown.length === 0
-              ? "Nothing matches. Clear a filter, or create your own below."
-              : `${shown.length} of ${movements.length} movements`
-            : `${movements.length} movements`}
-        </p>
-      </Card>
-
-      <Card className="enter enter-2 p-3 sm:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2 pb-4">
-          <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">Library</h2>
-          <div className="flex flex-wrap gap-1 rounded-3xl bg-black/25 p-1" role="group" aria-label="Show">
-            {(
-              [
-                ["all", "All"],
-                ["weighted", "Weighted"],
-                ["bodyWeight", "Body wt"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={filter === key}
-                onClick={() => setFilter(key)}
-                className={cn(
-                  "press flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold",
-                  filter === key ? "bg-white/[0.12] text-chalk" : "text-faint hover:text-chalk",
-                )}>
-                {label}
-                <span aria-hidden="true" className={filter === key ? "text-accent" : ""}>
-                  <Morph value={counts[key]} />
-                </span>
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-pressed={mineOnly}
-              onClick={() => setMineOnly((v) => !v)}
-              className={cn(
-                "press flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold",
-                mineOnly ? "bg-white/[0.12] text-chalk" : "text-faint hover:text-chalk",
-              )}>
-              Mine
-              <span aria-hidden="true" className={mineOnly ? "text-accent" : ""}>
-                <Morph value={mineCount} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setFiltersOpen(true)}
+            className={cn(
+              "press flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold md:hidden",
+              activeFilters > 0
+                ? "border-primary/60 bg-primary/15 text-chalk"
+                : "border-line bg-white/[0.04] text-muted hover:text-chalk",
+            )}>
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Filters
+            {activeFilters > 0 && (
+              <span className="num grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs text-primary-ink">
+                {activeFilters}
               </span>
-            </button>
+            )}
+          </button>
+          <div className="hidden md:block">
+            <FilterControls
+              state={filterState}
+              onChange={changeFilters}
+              counts={counts}
+              mineCount={mineCount}
+              layout="inline"
+            />
           </div>
+          <p className="num min-w-0 flex-1 truncate text-right text-xs text-faint md:text-left" aria-live="polite">
+            {filtering
+              ? shown.length === 0
+                ? "Nothing matches"
+                : `${shown.length} of ${movements.length} movements`
+              : `${movements.length} movements`}
+          </p>
         </div>
+      </div>
+
+      {filtersOpen && (
+        <FilterSheet
+          state={filterState}
+          onChange={changeFilters}
+          counts={counts}
+          mineCount={mineCount}
+          shown={shown.length}
+          onClear={() => changeFilters({ equipment: "", show: "all", mineOnly: false })}
+          onClose={() => setFiltersOpen(false)}
+        />
+      )}
+
+      <div className="enter enter-2">
         {shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line-strong px-4 py-10 text-center text-sm text-muted">
             {mineOnly && mineCount === 0 && !query && !category && !equipment
-              ? "You haven't created any movements. The library has plenty to start with."
+              ? "You haven't created any movements."
               : "No movements match."}
           </p>
         ) : (
@@ -236,13 +235,13 @@ function MovementsPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </div>
 
       {picked.length > 0 && (
         <div
           role="region"
           aria-label="Selected movements"
-          className="glass glass-strong sticky bottom-24 z-10 flex items-center gap-3 rounded-[1.5rem] p-3 md:bottom-4">
+          className="glass glass-strong sticky bottom-28 z-10 flex items-center gap-3 rounded-[1.5rem] p-3 md:bottom-4">
           <p className="num min-w-0 flex-1 px-2 text-sm font-semibold text-chalk">{picked.length} selected</p>
           <Button variant="ghost" size="sm" onClick={() => setPicked([])}>
             <X className="h-4 w-4" />
@@ -256,12 +255,9 @@ function MovementsPage() {
 
       <Card id="create-movement" className="enter enter-3 scroll-mt-6 p-3 sm:p-4">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1 px-2 pt-2">
-            <p className="eyebrow">Not in the library?</p>
-            <h2 className="text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">
-              Create your own movement
-            </h2>
-          </div>
+          <h2 className="px-2 pt-2 text-lg font-semibold tracking-tight text-chalk font-stretch-[112%]">
+            Create your own movement
+          </h2>
           <div className="flex gap-2">
             <Input
               aria-label="Movement name"
@@ -307,7 +303,7 @@ function MovementsPage() {
             </Select>
           </div>
           <div className="space-y-2 px-2">
-            <p className="eyebrow">Muscles (optional)</p>
+            <p className="text-sm text-muted">Muscles (optional)</p>
             <MusclePicker value={muscles} onChange={setMuscles} />
           </div>
         </form>
