@@ -92,7 +92,7 @@ function CreateAccountPage() {
       </form>
       <p className="mt-7 text-center text-sm text-muted">
         Already have an account?{" "}
-        <Link to="/sign-in" className="font-semibold text-primary underline-offset-4 hover:underline">
+        <Link to="/sign-in" className="font-semibold text-accent underline-offset-4 hover:underline">
           Sign in
         </Link>
       </p>

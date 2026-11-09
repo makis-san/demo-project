@@ -9,10 +9,12 @@ import {
   historyMovementsQueryOptions,
   progressionQueryKey,
   progressionQueryOptions,
+  trainingCalendarQueryOptions,
   workoutHistoryQueryKey,
   workoutHistoryQueryOptions,
 } from "./-queries/workout-history";
 import { ProgressionChart } from "./-progression-chart";
+import { TrainingCalendar } from "./-training-calendar";
 import { useSuspenseInfiniteQuery, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { weightUnit } from "@/lib/units";
 import { PageHeader } from "@/components/page-header";
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/__index/_layout/workout-history/")({
     const [, movements] = await Promise.all([
       context.queryClient.ensureInfiniteQueryData(workoutHistoryQueryOptions()),
       context.queryClient.ensureQueryData(historyMovementsQueryOptions()),
+      context.queryClient.ensureQueryData(trainingCalendarQueryOptions(context.timeZone)),
     ]);
     // Fetch the chart for the movement that is selected first, so it is in the server-rendered page.
     const first = movements[0];
@@ -81,6 +84,8 @@ function WorkoutHistoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Review" title="Workout History" />
+
+      <TrainingCalendar timeZone={timeZone} />
 
       {movements.length > 0 && (
         <ProgressionChart

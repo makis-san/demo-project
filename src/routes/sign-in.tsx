@@ -76,7 +76,7 @@ function SignInPage() {
       </form>
       <p className="mt-7 text-center text-sm text-muted">
         Don't have an account?{" "}
-        <Link to="/create-account" className="font-semibold text-primary underline-offset-4 hover:underline">
+        <Link to="/create-account" className="font-semibold text-accent underline-offset-4 hover:underline">
           Create one
         </Link>
       </p>

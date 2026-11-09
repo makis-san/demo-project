@@ -1,5 +1,5 @@
 import { getHistoryMovementsServerFn, getWorkoutHistoryServerFn, type HistoryCursor } from "@/lib/workouts.server";
-import { getProgressionServerFn } from "@/lib/progression.server";
+import { getProgressionServerFn, getTrainingCalendarServerFn } from "@/lib/progression.server";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 // Starts every history key, so invalidating it refreshes the pages and the movement list together.
@@ -30,4 +30,12 @@ export const progressionQueryOptions = (movementId: string, timeZone: string) =>
   queryOptions({
     queryKey: [...progressionQueryKey, movementId, timeZone],
     queryFn: () => getProgressionServerFn({ data: { movementId } }),
+  });
+
+// Under the history key, so completing or deleting a workout refreshes it with the list. The timezone is in the
+// key for the same reason as the chart's.
+export const trainingCalendarQueryOptions = (timeZone: string) =>
+  queryOptions({
+    queryKey: [...workoutHistoryQueryKey, "calendar", timeZone],
+    queryFn: () => getTrainingCalendarServerFn(),
   });

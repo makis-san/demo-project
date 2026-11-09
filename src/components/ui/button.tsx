@@ -18,7 +18,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   ghost: "text-muted hover:bg-white/[0.07] hover:text-chalk",
   destructive: "border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20 hover:border-danger/60",
   secondary: "bg-white/[0.08] text-chalk hover:bg-white/[0.13]",
-  link: "text-primary underline-offset-4 hover:underline",
+  link: "text-accent underline-offset-4 hover:underline",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
