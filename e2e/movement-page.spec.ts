@@ -180,7 +180,7 @@ test.describe("Movement page", () => {
     await startWorkout(page);
     await addSet(page, { movement: "Bench Press", weight: 100, reps: 5 });
     await addSet(page, { movement: "Bench Press", weight: 110, reps: 3 });
-    await page.getByRole("button", { name: "Complete Workout" }).click();
+    await page.getByRole("button", { name: "Finish Workout" }).click();
     await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
 
     await openMovement(page, "Bench Press");
@@ -203,99 +203,5 @@ test.describe("Movement page", () => {
 
     await expect(page.getByText("That movement doesn't exist.")).toBeVisible();
     await expect(page.getByText("Secret Lift")).toHaveCount(0);
-  });
-});
-
-test.describe("Movement menu in the workout", () => {
-  test("should open a menu, filter it by typing, and pick a movement", async ({ page }) => {
-    await startWorkout(page);
-    const menu = page.getByRole("combobox", { name: "Movement" });
-    await expect(menu).toContainText("Choose a movement");
-
-    await menu.click();
-    await page.getByRole("searchbox", { name: "Search movements" }).fill("incline");
-    const options = page.getByRole("option");
-    await expect(options).toHaveText([/Incline Bench Press/, /Incline Dumbbell Curl/, /Incline Dumbbell Press/]);
-
-    await options.filter({ hasText: "Incline Bench Press" }).click();
-    await expect(menu).toContainText("Incline Bench Press");
-    await expect(page.getByRole("listbox")).toHaveCount(0);
-  });
-
-  test("should work with the keyboard: arrows, Enter and Escape", async ({ page }) => {
-    await startWorkout(page);
-    const menu = page.getByRole("combobox", { name: "Movement" });
-    await menu.click();
-    const search = page.getByRole("searchbox", { name: "Search movements" });
-    await search.fill("curl");
-    // Wait for the list to be the filtered one: Enter acts on what is listed.
-    await expect(page.getByRole("option").first()).toContainText(/curl/i);
-
-    await search.press("ArrowDown");
-    const second = await page.getByRole("option").nth(1).locator("span.truncate").first().innerText();
-    await search.press("Enter");
-    await expect(menu).toContainText(second);
-
-    await menu.click();
-    await page.getByRole("searchbox", { name: "Search movements" }).press("Escape");
-    await expect(page.getByRole("listbox")).toHaveCount(0);
-  });
-
-  test("should say when nothing matches", async ({ page }) => {
-    await startWorkout(page);
-    await page.getByRole("combobox", { name: "Movement" }).click();
-    await page.getByRole("searchbox", { name: "Search movements" }).fill("qqqqqq");
-
-    await expect(page.getByText("No movement matches “qqqqqq”.")).toBeVisible();
-  });
-
-  test("should load a page at a time, and the next one when the end of the list is reached", async ({ page }) => {
-    // Every request for movements, by the number of options it returned.
-    const pages: number[] = [];
-    page.on("response", async (response) => {
-      if (!response.url().includes("/_serverFn/") || response.request().method() !== "GET") return;
-      const text = await response.text().catch(() => "");
-      const count = (text.match(/"isBuiltIn"/g) ?? []).length;
-      if (count > 0) pages.push(count);
-    });
-    await startWorkout(page);
-    // Nothing is loaded until the menu is opened, and then only the first page.
-    expect(Math.max(0, ...pages)).toBeLessThan(90);
-
-    await page.getByRole("combobox", { name: "Movement" }).click();
-    const options = page.getByRole("option");
-    await expect(options).toHaveCount(20);
-    expect(Math.max(0, ...pages)).toBeLessThanOrEqual(21);
-
-    // Scrolling to the end brings the next page, and again, until the library has been read.
-    const list = page.getByRole("listbox");
-    await list.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-    await expect(options).toHaveCount(40);
-    await expect
-      .poll(
-        async () => {
-          await list.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-          return options.count();
-        },
-        { timeout: 15_000 },
-      )
-      .toBeGreaterThanOrEqual(90);
-    await expect(page.getByText("Loading more…")).toHaveCount(0);
-
-    // Every page was a different set of movements: nothing listed twice.
-    const names = await options.evaluateAll((els) =>
-      els.map((el) => el.querySelector("span.font-medium")!.textContent),
-    );
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  test("should list the user's own movements next to the built-in ones", async ({ page }) => {
-    await addMovement(page, "Sandbag Carry");
-    await startWorkout(page);
-
-    await page.getByRole("combobox", { name: "Movement" }).click();
-    await page.getByRole("searchbox", { name: "Search movements" }).fill("sandbag");
-    await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(page.getByRole("option")).toContainText("Yours");
   });
 });

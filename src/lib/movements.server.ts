@@ -3,7 +3,14 @@ import { getServerSidePrismaClient, isUniqueViolation } from "@/lib/db.server";
 import { authMiddleware } from "@/lib/auth.server";
 import { errorMiddleware } from "@/lib/errors.server";
 import { movementCatalog } from "@/lib/movement-catalog";
-import { equipmentSchema, muscleListSchema, musclesAreDisjoint } from "@/lib/muscles";
+import {
+  categorySchema,
+  equipmentSchema,
+  musclesOfCategory,
+  muscleListSchema,
+  musclesAreDisjoint,
+  type MovementCategory,
+} from "@/lib/muscles";
 import { z } from "zod";
 
 /**
@@ -116,7 +123,7 @@ export const getMovementServerFn = createServerFn()
 export const movementSearchPageSize = 20;
 
 /**
- * One page of the movements a user can pick, filtered by name, for the picker in the workout. The library has about
+ * One page of the movements a user can pick, filtered by name and body part, for the picker in the workout. The library has about
  * a hundred built-ins and a user can add their own, so the picker asks for a page at a time and the server does
  * the filtering, instead of sending all of them to the browser. The order is name and then id, and the cursor is
  * the id of the last row of the page before, so a movement is never listed twice or skipped.
@@ -124,20 +131,28 @@ export const movementSearchPageSize = 20;
  */
 export const searchMovementsServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
-  .inputValidator(z.object({ search: z.string().trim().max(100), cursor: z.string().nullable() }))
+  .inputValidator(
+    z.object({
+      search: z.string().trim().max(100),
+      cursor: z.string().nullable(),
+      category: categorySchema.nullable(),
+    }),
+  )
   .handler(
     async ({
       context,
       data,
     }: {
       context: { user: { id: string } };
-      data: { search: string; cursor: string | null };
+      data: { search: string; cursor: string | null; category: MovementCategory | null };
     }) => {
       const prisma = await getServerSidePrismaClient();
       const rows = await prisma.movement.findMany({
         where: {
           ...visibleMovements(context.user.id),
           ...(data.search && { name: { contains: data.search, mode: "insensitive" as const } }),
+          // A body-part tab: the movement works one of its muscles as a primary muscle.
+          ...(data.category && { primaryMuscles: { hasSome: [...musclesOfCategory(data.category)] } }),
         },
         select: movementSelect,
         orderBy: [{ name: "asc" }, { id: "asc" }],

@@ -28,24 +28,28 @@ const sizeStyles: Record<ButtonSize, string> = {
   icon: "h-10 w-10",
 };
 
+/** The classes of a button, for a link that should look like one. */
+function buttonClasses({
+  variant = "default",
+  size = "default",
+  className,
+}: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
+  return cn(
+    "press inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium",
+    "disabled:pointer-events-none disabled:opacity-40",
+    "[&>svg]:pointer-events-none [&>svg]:shrink-0",
+    variantStyles[variant],
+    sizeStyles[size],
+    className,
+  );
+}
+
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", disabled, ...props }, ref) => (
-    <button
-      ref={ref}
-      disabled={disabled}
-      className={cn(
-        "press inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium",
-        "disabled:pointer-events-none disabled:opacity-40",
-        "[&>svg]:pointer-events-none [&>svg]:shrink-0",
-        variantStyles[variant],
-        sizeStyles[size],
-        className,
-      )}
-      {...props}
-    />
+    <button ref={ref} disabled={disabled} className={buttonClasses({ variant, size, className })} {...props} />
   ),
 );
 Button.displayName = "Button";
 
-export { Button };
+export { Button, buttonClasses };
 export type { ButtonVariant, ButtonSize, ButtonProps };

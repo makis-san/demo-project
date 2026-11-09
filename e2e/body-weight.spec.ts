@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { goTo, logBodyWeight, selectMovement, startWorkout } from "./helpers";
+import { goTo, logBodyWeight, selectMovement, setRows, startWorkout } from "./helpers";
 
 test.describe("Body weight", () => {
   test("should log a body weight and show it in the list and the chart", async ({ page }) => {
@@ -48,7 +48,7 @@ test.describe("Body weight", () => {
     await weight.fill("200");
     await page.getByLabel("Reps").fill("5");
     await page.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: "Pull-Up" })).toContainText("5 reps × 200 lbs");
+    await expect(setRows(page).filter({ hasText: "Pull-Up" })).toContainText("5 reps × 200 lbs");
 
     // A filled-in body weight does not stay behind on a normal movement.
     await weight.fill("");

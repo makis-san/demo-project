@@ -70,6 +70,35 @@ export const muscleListSchema = z
 export const musclesAreDisjoint = (value: { primaryMuscles: string[]; secondaryMuscles: string[] }) =>
   value.primaryMuscles.every((muscle) => !value.secondaryMuscles.includes(muscle));
 
+/**
+ * The tabs of the movement screens: the 14 muscle groups folded into the body parts people think in. A movement is in a
+ * tab when any of its primary muscles is in it, so a deadlift shows under Back and under Legs. A custom movement with
+ * no muscles is in no tab, only in All.
+ */
+export const movementCategories = [
+  { id: "chest", label: "Chest", muscles: ["chest"] },
+  { id: "back", label: "Back", muscles: ["lats", "traps", "lower_back"] },
+  { id: "shoulders", label: "Shoulders", muscles: ["shoulders"] },
+  { id: "biceps", label: "Biceps", muscles: ["biceps"] },
+  { id: "triceps", label: "Triceps", muscles: ["triceps"] },
+  { id: "forearms", label: "Forearms", muscles: ["forearms"] },
+  { id: "legs", label: "Legs", muscles: ["quads", "hamstrings", "glutes", "calves"] },
+  { id: "core", label: "Core", muscles: ["abs", "obliques"] },
+] as const satisfies readonly { id: string; label: string; muscles: readonly MuscleGroup[] }[];
+
+export type MovementCategory = (typeof movementCategories)[number]["id"];
+export const categoryIds = movementCategories.map((c) => c.id) as [MovementCategory, ...MovementCategory[]];
+export const categorySchema = z.enum(categoryIds);
+
+export function musclesOfCategory(id: MovementCategory): readonly MuscleGroup[] {
+  return movementCategories.find((c) => c.id === id)!.muscles;
+}
+
+export function isInCategory(primaryMuscles: readonly MuscleGroup[], id: MovementCategory) {
+  const muscles = musclesOfCategory(id);
+  return primaryMuscles.some((m) => muscles.includes(m));
+}
+
 /** Sets a movement gives to each muscle group: a primary muscle counts 1 set, a secondary one half. */
 export const primarySetWeight = 1;
 export const secondarySetWeight = 0.5;

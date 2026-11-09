@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { formatDate, shortDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteWorkoutsServerFn, repeatWorkoutServerFn } from "@/lib/workouts.server";
+import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
 import { ChevronRight, Repeat2, Trash2 } from "lucide-react";
 import { SetValues } from "@/components/set-values";
 import { cn } from "@/lib/utils";
@@ -64,16 +64,6 @@ function WorkoutHistoryPage() {
   // Only one workout can be active, so a repeat is offered only while there is none.
   const { data: activeWorkout } = useQuery(currentWorkoutQueryOptions());
   const hasActiveWorkout = !!activeWorkout;
-
-  const repeatMutation = useMutation({
-    mutationFn: async (workoutId: string) => {
-      const result = await repeatWorkoutServerFn({ data: { workoutId } });
-      if (!result.success) throw new Error(result.error);
-    },
-    onSuccess: () => navigate({ to: "/current-workout" }),
-    // Also after a refusal: the page may not know yet that a workout is open.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey }),
-  });
 
   const toggleOpen = (id: string) =>
     setOpenWorkouts((prev) => {
@@ -226,10 +216,12 @@ function WorkoutHistoryPage() {
                                   title={
                                     hasActiveWorkout
                                       ? "Finish your current workout first"
-                                      : "Start a new workout with these sets as a checklist"
+                                      : "See this workout again, and start it when you are ready"
                                   }
-                                  disabled={hasActiveWorkout || workout.sets.length === 0 || repeatMutation.isPending}
-                                  onClick={() => repeatMutation.mutate(workout.id)}
+                                  disabled={hasActiveWorkout || workout.sets.length === 0}
+                                  onClick={() =>
+                                    navigate({ to: "/start-workout", search: { preset: undefined, from: workout.id } })
+                                  }
                                   className="press grid h-8 w-8 shrink-0 place-items-center rounded-full text-accent hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-30">
                                   <Repeat2 className="h-4 w-4" />
                                 </button>

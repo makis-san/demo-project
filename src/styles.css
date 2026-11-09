@@ -394,10 +394,12 @@
     text-transform: uppercase;
     color: var(--color-faint);
   }
-  .body-map .sil {
+  .body-map .sil,
+  .body-thumb .sil {
     fill: oklch(24% 0.008 20);
   }
-  .body-map .m {
+  .body-map .m,
+  .body-thumb .m {
     --i: 0;
     fill: color-mix(in oklch, oklch(36% 0.012 20), #e0262a calc(var(--i) * 100%));
     stroke: oklch(13% 0.008 20);
@@ -410,6 +412,72 @@
   .body-map .m,
   .figure-phase i {
     transition: none;
+  }
+}
+
+/* The body-part image on a movement card: a zoomed piece of the map, lit where the movement works. */
+.body-thumb {
+  display: block;
+  background: oklch(13% 0.008 20);
+}
+
+/* The movement sheet: it rises from the bottom edge on a phone and pops in at the middle of a desktop. */
+@layer utilities {
+  .sheet-backdrop {
+    animation: fade-in 200ms ease-out both;
+  }
+  .sheet {
+    animation: sheet-up 340ms var(--ease-enter) both;
+  }
+  @media (min-width: 40rem) {
+    .sheet {
+      animation: pop-in 260ms var(--ease-enter) both;
+    }
+  }
+}
+
+/* The numbers of the start countdown: each one pops in big, settles, and fades as the next arrives. */
+.count-pop {
+  animation: count-pop 750ms var(--ease-enter) both;
+}
+@keyframes count-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .count-pop {
+    animation: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
   }
 }
 
@@ -459,7 +527,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .enter {
+  .enter,
+  .sheet,
+  .sheet-backdrop {
     animation: none;
   }
   .press,
@@ -486,4 +556,227 @@
   -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 18px 40px -18px oklch(0% 0 0 / 0.7);
   font-size: 0.875rem;
+}
+
+/*
+ * The workout ring. Arcs take their length from CSS variables, so they glide from one second to the next, and
+ * @starting-style grows each new arc out of nothing: the ring blooms on load, and a new section grows from the head.
+ */
+.orbit-arc {
+  stroke-dasharray: var(--dash);
+  stroke-dashoffset: var(--offset);
+  transition:
+    stroke-dasharray 1s linear,
+    stroke-dashoffset 1s linear,
+    stroke-width 400ms var(--ease-out-soft),
+    opacity 400ms ease;
+}
+@starting-style {
+  .orbit-arc {
+    stroke-dasharray: 0 100;
+  }
+}
+.orbit-enter {
+  animation: orbit-enter 900ms var(--ease-enter) both;
+}
+@keyframes orbit-enter {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.9);
+  }
+}
+/* The head turns along the ring each second, keeping pace with the current arc. It is drawn at the top and rotated, so
+   it follows the ring instead of cutting across it. */
+.orbit-head {
+  transform-origin: 60px 60px;
+  transition: transform 1s linear;
+}
+/* For a moment after the movement changes, the arcs and the head move quickly together, so the head rides the new arc
+   as it grows and lands with the burst. The inner ring's sets keep their own timing (.orbit-slot, below). Keep the
+   duration in step with JUMP_MS in -workout-ring.tsx. */
+.orbit-jump .orbit-arc,
+.orbit-jump .orbit-head {
+  transition-duration: 550ms;
+  transition-timing-function: var(--ease-out-soft);
+}
+/* A soft glow under the current arc that breathes while the clock runs. */
+.orbit-glow {
+  filter: blur(3px);
+  animation: ring-breathe 2.4s ease-in-out infinite;
+}
+@keyframes ring-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+/* A ring that spreads from the head, like a sonar ping, to say the clock is running. */
+.orbit-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbit-ping 2s var(--ease-out-soft) infinite;
+}
+@keyframes orbit-ping {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+/* A set pip or a break line arriving on the ring. */
+.orbit-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbit-pop 480ms var(--ease-enter) both;
+}
+@keyframes orbit-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* Text in the middle that changes (the movement, the set, Paused) slides in instead of snapping. */
+.orbit-swap {
+  animation: orbit-swap 420ms var(--ease-enter) both;
+}
+@keyframes orbit-swap {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+    filter: blur(4px);
+  }
+}
+/* A paused clock breathes, like a stopwatch on hold. */
+.clock-hold {
+  animation: clock-hold 1.6s ease-in-out infinite;
+}
+@keyframes clock-hold {
+  50% {
+    opacity: 0.35;
+  }
+}
+.icon-in {
+  animation: icon-in 320ms var(--ease-enter) both;
+}
+@keyframes icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.4);
+  }
+}
+/* Next glows when every planned set of the current movement is done: time to move on. */
+.next-ready {
+  animation: next-ready 1.8s ease-in-out infinite;
+}
+@keyframes next-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(80% 0.11 195 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px oklch(80% 0.11 195 / 0.28);
+  }
+}
+/* The Pause button sends out a slow ring while paused, so the state is clear from across the room. */
+.pause-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--color-primary);
+  animation: pause-halo 1.8s var(--ease-out-soft) infinite;
+}
+@keyframes pause-halo {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* The swipeable panes of the current workout on a phone: the scrollbar is hidden, the swipe is the control. */
+.swipe-panes {
+  scrollbar-width: none;
+}
+.swipe-panes::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Finish is a chequered flag. A soft band of shade crosses the squares while the button is hovered or focused, like
+ * cloth waving, and holds still otherwise.
+ */
+.checkered {
+  background-image: repeating-conic-gradient(oklch(92% 0.006 20) 0 25%, oklch(15% 0.008 20) 0 50%);
+  background-size: 14px 14px;
+}
+.checkered::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    oklch(0% 0 0 / 0.45) 35%,
+    transparent 50%,
+    oklch(100% 0 0 / 0.14) 65%,
+    transparent 85%
+  );
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  animation: flag-wave 1.6s linear infinite paused;
+}
+.flag-button:hover .checkered::after,
+.flag-button:focus-visible .checkered::after {
+  animation-play-state: running;
+}
+@keyframes flag-wave {
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arc,
+  .orbit-head {
+    transition: none;
+  }
+  .checkered::after,
+  .orbit-enter,
+  .orbit-glow,
+  .orbit-ping,
+  .orbit-pop,
+  .orbit-swap,
+  .clock-hold,
+  .icon-in,
+  .next-ready,
+  .pause-halo::after {
+    animation: none;
+  }
+}
+
+/* A set segment on the inner ring lights up when its set is logged, and the segments ease to new places. */
+.orbit-arc.orbit-slot {
+  transition:
+    stroke-dasharray 600ms var(--ease-enter),
+    stroke-dashoffset 600ms var(--ease-enter),
+    stroke-opacity 500ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arc.orbit-slot {
+    transition: none;
+  }
 }

@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Check, Plus, Repeat2, SlidersHorizontal, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Morph } from "@/components/morph";
 import { Stat } from "@/components/stat";
 import { StepButton, stepValue } from "@/components/stepper";
 import { RestLengthButton, type RestTimerState } from "@/components/rest-timer";
 import { SetValues } from "@/components/set-values";
-import { MovementPicker, type MovementOption } from "@/components/movement-picker";
-import { formatClock, useNow } from "@/lib/use-now";
+import type { MovementOption } from "@/components/movement-card";
+import { formatClock } from "@/lib/use-now";
 import { weightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
@@ -54,49 +53,8 @@ export function personalRecords(sets: LoggedSet[], history: Map<string, Movement
 
 /* ------------------------------------------------------------------------------------------------------------ */
 
-/** The session at a glance: the date, a running clock, and the totals, which roll as sets are logged. */
-export function SessionCard({
-  title,
-  startedAt,
-  sets,
-}: {
-  title: string;
-  startedAt: Date | string;
-  sets: LoggedSet[];
-}) {
-  const now = useNow(1000);
-  const elapsed = now === null ? null : (now - new Date(startedAt).getTime()) / 1000;
-  const movementCount = new Set(sets.map((set) => set.movement.id)).size;
-
-  return (
-    <Card className="enter enter-1 p-4 sm:p-7">
-      <div className="flex items-center justify-between gap-4">
-        <p className="eyebrow">Session</p>
-        <div className="flex items-center gap-2 rounded-full bg-black/25 py-1.5 pr-3.5 pl-3" aria-hidden="true">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-60 motion-reduce:animate-none" />
-            <span className="relative h-2 w-2 rounded-full bg-primary" />
-          </span>
-          <span className="text-base font-bold text-chalk font-stretch-[88%]">
-            {elapsed === null ? <span className="num">0:00</span> : <Morph value={formatClock(elapsed)} />}
-          </span>
-        </div>
-      </div>
-      <CardTitle className="mt-1 text-lg sm:mt-0 sm:text-2xl">{title}</CardTitle>
-      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 sm:mt-6 sm:pt-5 [&_p:first-child]:text-2xl sm:[&_p:first-child]:text-4xl">
-        <Stat label="Sets" value={sets.length} morph />
-        <Stat label="Movements" value={movementCount} morph />
-        <Stat label="Volume" value={volumeFormat.format(volumeOf(sets))} unit={weightUnit} morph />
-      </div>
-    </Card>
-  );
-}
-
-/* ------------------------------------------------------------------------------------------------------------ */
-
 type ComposerProps = {
-  selectedMovement: MovementOption | null;
-  onMovementChange: (movement: MovementOption) => void;
+  selectedMovement: MovementOption;
   weight: string;
   onWeightChange: (value: string) => void;
   reps: string;
@@ -104,9 +62,6 @@ type ComposerProps = {
   onSubmit: (e: React.FormEvent) => void;
   isPending: boolean;
   needsBodyWeight: React.ReactNode;
-  /** This session's movements, newest first, with the last set of each. */
-  recent: { movement: LoggedSet["movement"]; last: LoggedSet }[];
-  onPickRecent: (set: LoggedSet) => void;
   history: MovementHistory | undefined;
   /** Where − and + start from on an empty field: the last weight and reps for this movement. */
   startWeight?: number;
@@ -116,51 +71,32 @@ type ComposerProps = {
 };
 
 /**
- * Logging a set, built for one thumb between sets: tap the movement (the phone's own picker opens), nudge weight
- * and reps with − and + (hold to run), then Add. Movements already in the session are one tap away above it.
+ * Logging a set, built for one thumb between sets: nudge weight and reps with − and + (hold to run), then Add. It is for
+ * the movement picked with "Add movement", from a chip of this session, or from "Adjust" on a planned set. The movement
+ * is not chosen here: the sheet that picks it is opened from the page's "Add movement" button.
  */
 export function SetComposer(props: ComposerProps) {
   const selected = props.selectedMovement;
-  const canAdd = !!selected && !!props.reps && !!props.weight;
+  const canAdd = !!props.reps && !!props.weight;
 
-  let hint = "Pick what you're lifting";
-  if (selected && props.history === undefined) hint = " ";
-  else if (selected && props.history === null) hint = "First time logging this one";
-  else if (selected && props.history)
+  let hint = " ";
+  if (props.history === null) hint = "First time logging this one";
+  else if (props.history)
     hint = `Last top set ${numberFormat.format(props.history.lastTop)} ${weightUnit} · ${formatDay(props.history.lastDay)} · Best ${numberFormat.format(props.history.best)}`;
 
   return (
     <Card className="enter enter-2 z-10 p-3 sm:p-4">
       <form onSubmit={props.onSubmit} className="space-y-3">
-        {props.recent.length > 0 && (
-          <div className="-mx-3 overflow-x-auto px-3 pt-1 sm:-mx-4 sm:px-4">
-            <p className="eyebrow mb-2 px-1">This session</p>
-            <div className="flex gap-2 pb-1">
-              {props.recent.map(({ movement, last }) => {
-                const active = movement.id === selected?.id;
-                return (
-                  <button
-                    key={movement.id}
-                    type="button"
-                    onClick={() => props.onPickRecent(last)}
-                    className={cn(
-                      "press flex shrink-0 flex-col items-start rounded-2xl border px-3.5 py-2 text-left",
-                      active
-                        ? "border-primary/60 bg-primary/12 text-chalk"
-                        : "border-line bg-white/[0.04] text-muted hover:border-line-strong hover:text-chalk",
-                    )}>
-                    <span className="max-w-40 truncate text-sm font-semibold text-chalk">{movement.name}</span>
-                    <span className="num text-xs">
-                      {last.reps} × {numberFormat.format(last.weight)} {weightUnit}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <MovementPicker value={selected} onChange={props.onMovementChange} hint={hint} />
+        <div
+          role="group"
+          aria-label="Selected movement"
+          className="rounded-[1.25rem] border border-line bg-black/25 px-4 py-3.5">
+          <p className="eyebrow">Movement</p>
+          <p className="mt-1 truncate text-xl font-semibold tracking-tight text-chalk font-stretch-[108%]">
+            {selected.name}
+          </p>
+          <p className="num mt-0.5 min-h-4 truncate text-xs text-muted">{hint}</p>
+        </div>
 
         <NumberDial
           label={`Weight · ${weightUnit}`}
@@ -220,6 +156,45 @@ export function SetComposer(props: ComposerProps) {
         </div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * The movements already used in this session, newest first, as chips: one tap picks a movement and its last weight and
+ * reps again, to log another set of it.
+ */
+export function RecentMovements({
+  recent,
+  selectedId,
+  onPick,
+}: {
+  recent: { movement: LoggedSet["movement"]; last: LoggedSet }[];
+  selectedId: string | undefined;
+  onPick: (set: LoggedSet) => void;
+}) {
+  return (
+    <div className="-mx-1 overflow-x-auto px-1 pb-1">
+      <p className="eyebrow mb-2 px-1">This session</p>
+      <div className="flex gap-2 pb-1">
+        {recent.map(({ movement, last }) => (
+          <button
+            key={movement.id}
+            type="button"
+            onClick={() => onPick(last)}
+            className={cn(
+              "press flex shrink-0 flex-col items-start rounded-2xl border px-3.5 py-2 text-left",
+              movement.id === selectedId
+                ? "border-primary/60 bg-primary/12 text-chalk"
+                : "border-line bg-white/[0.04] text-muted hover:border-line-strong hover:text-chalk",
+            )}>
+            <span className="max-w-40 truncate text-sm font-semibold text-chalk">{movement.name}</span>
+            <span className="num text-xs">
+              {last.reps} × {numberFormat.format(last.weight)} {weightUnit}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -372,7 +347,18 @@ export function SetList({
 /* ------------------------------------------------------------------------------------------------------------ */
 
 /** A set from the workout this one was repeated from: a plan, not a logged set. */
-export type PlannedSet = { id: string; reps: number; weight: number; movement: LoggedSet["movement"] };
+export type PlannedSet = {
+  id: string;
+  reps: number;
+  /** Optional in a preset: a value to help track progress. */
+  weight: number | null;
+  /** The rest a preset asks for after this set. Null for a repeated workout. */
+  restSeconds: number | null;
+  movement: LoggedSet["movement"];
+};
+
+const plannedText = (set: { reps: number; weight: number | null }) =>
+  `${set.reps} × ${set.weight === null ? "no weight" : `${set.weight} ${weightUnit}`}`;
 
 /**
  * Which planned sets are already done. Nothing is stored for it: the nth planned set of a movement is done once the
@@ -399,18 +385,28 @@ export function plannedProgress(plan: PlannedSet[], logged: LoggedSet[]) {
  */
 export function PlannedSets({
   plan,
-  sourceDate,
+  source,
   logged,
   onLog,
   onAdjust,
   pending,
+  colors,
+  currentId,
+  onFocusMovement,
 }: {
   plan: PlannedSet[];
-  sourceDate: string;
+  /** Where the plan comes from: the preset's name, or the date of the workout it repeats. */
+  source: string;
   logged: LoggedSet[];
   onLog: (set: PlannedSet) => void;
   onAdjust: (set: PlannedSet) => void;
   pending: boolean;
+  /** The ring's colour for each movement, so a movement here and its arc on the ring match. */
+  colors?: Map<string | null, string>;
+  /** The ring's current movement: its sets are the ones to do now. */
+  currentId?: string | null;
+  /** Makes a movement the current one on the ring, from a tap on its name. */
+  onFocusMovement?: (movement: PlannedSet["movement"]) => void;
 }) {
   const done = plannedProgress(plan, logged);
   const groups: { movement: PlannedSet["movement"]; sets: PlannedSet[] }[] = [];
@@ -421,74 +417,132 @@ export function PlannedSets({
   }
 
   return (
-    <Card className="enter p-2 sm:p-3" aria-label="Planned sets">
+    <Card role="region" className="enter p-2 sm:p-3" aria-label="Planned sets">
       <div className="flex items-center justify-between gap-3 px-3 pt-2 pb-3">
         <div className="min-w-0">
-          <p className="eyebrow">Planned from {sourceDate}</p>
+          <p className="eyebrow">Planned from {source}</p>
           <p className="num text-base font-semibold tracking-tight text-chalk font-stretch-[108%]">
             {done.size} of {plan.length} logged
           </p>
         </div>
       </div>
-      <div className="space-y-3">
-        {groups.map(({ movement, sets }) => (
-          <div key={movement.id}>
-            <p className="truncate px-3 pb-1.5 text-sm font-semibold text-muted">{movement.name}</p>
-            <ul className="space-y-1" aria-label={`Planned ${movement.name} sets`}>
-              {sets.map((set) => {
-                const isDone = done.has(set.id);
-                return (
-                  <li
-                    key={set.id}
-                    data-done={isDone}
-                    className={cn(
-                      "flex items-center gap-2 rounded-2xl bg-well py-1.5 pr-1.5 pl-3",
-                      isDone && "opacity-50",
-                    )}>
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "grid h-6 w-6 shrink-0 place-items-center rounded-full border",
-                        isDone ? "border-ok bg-ok/20 text-ok" : "border-line-strong text-transparent",
-                      )}>
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="num min-w-0 flex-1 text-sm whitespace-nowrap text-muted">
-                      <span className="text-lg font-bold text-chalk">{set.reps}</span> reps ×{" "}
-                      <span className="text-lg font-bold text-chalk">{set.weight}</span> {weightUnit}
-                    </span>
-                    {isDone ? (
-                      <span className="pr-3 text-xs font-semibold text-ok">Logged</span>
-                    ) : (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Adjust planned ${movement.name} set: ${set.reps} × ${set.weight} ${weightUnit}`}
-                          onClick={() => onAdjust(set)}
-                          className="h-10 px-3 text-muted">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          Adjust
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending}
-                          aria-label={`Log planned ${movement.name} set: ${set.reps} × ${set.weight} ${weightUnit}`}
-                          onClick={() => onLog(set)}
-                          className="h-10 px-4">
-                          Log
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+      {/* One segment per planned set, in the ring's colours, filled as sets are logged. */}
+      <div aria-hidden="true" className="mx-3 mb-4 flex gap-1">
+        {plan.map((set) => (
+          <span key={set.id} className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07]">
+            <span
+              className="block h-full origin-left rounded-full transition-transform duration-500 ease-[var(--ease-enter)]"
+              style={{
+                background: colors?.get(set.movement.id) ?? "var(--color-ok)",
+                transform: `scaleX(${done.has(set.id) ? 1 : 0})`,
+              }}
+            />
+          </span>
         ))}
+      </div>
+      <div className="space-y-3">
+        {groups.map(({ movement, sets }) => {
+          const color = colors?.get(movement.id);
+          const isCurrent = currentId === movement.id;
+          return (
+            <div
+              key={movement.id}
+              data-current={isCurrent}
+              className={cn(
+                "rounded-[1.4rem] p-1 transition-[background-color,box-shadow] duration-500",
+                isCurrent && "bg-white/[0.035]",
+              )}
+              style={
+                isCurrent && color
+                  ? { boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${color} 45%, transparent)` }
+                  : undefined
+              }>
+              <button
+                type="button"
+                onClick={() => onFocusMovement?.(movement)}
+                disabled={!onFocusMovement || isCurrent}
+                aria-label={
+                  isCurrent ? `${movement.name}, the current movement` : `Make ${movement.name} the current movement`
+                }
+                className="group flex w-full min-w-0 items-center gap-2 px-2 pt-1 pb-1.5 text-left disabled:cursor-default">
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full transition-transform duration-300 group-hover:scale-125"
+                  style={{ background: color ?? "var(--color-faint)" }}
+                />
+                <span className={cn("truncate text-sm font-semibold", isCurrent ? "text-chalk" : "text-muted")}>
+                  {movement.name}
+                </span>
+                {isCurrent && (
+                  <span
+                    className="orbit-swap rounded-full px-2 py-0.5 text-[0.65rem] font-bold tracking-wider text-ground uppercase"
+                    style={{ background: color }}>
+                    Now
+                  </span>
+                )}
+              </button>
+              <ul className="space-y-1" aria-label={`Planned ${movement.name} sets`}>
+                {sets.map((set) => {
+                  const isDone = done.has(set.id);
+                  return (
+                    <li
+                      key={set.id}
+                      data-done={isDone}
+                      className={cn(
+                        "flex items-center gap-2 rounded-2xl bg-well py-1.5 pr-1.5 pl-3 transition-opacity duration-500",
+                        isDone && "opacity-50",
+                      )}>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors duration-300",
+                          isDone ? "border-ok bg-ok/20 text-ok" : "border-line-strong text-transparent",
+                        )}>
+                        <Check key={String(isDone)} className={cn("h-3.5 w-3.5", isDone && "orbit-pop")} />
+                      </span>
+                      <span className="num min-w-0 flex-1 text-sm whitespace-nowrap text-muted">
+                        <span className="text-lg font-bold text-chalk">{set.reps}</span> reps ×{" "}
+                        {set.weight === null ? (
+                          <span className="text-faint">no weight</span>
+                        ) : (
+                          <>
+                            <span className="text-lg font-bold text-chalk">{set.weight}</span> {weightUnit}
+                          </>
+                        )}
+                      </span>
+                      {isDone ? (
+                        <span className="pr-3 text-xs font-semibold text-ok">Logged</span>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Adjust planned ${movement.name} set: ${plannedText(set)}`}
+                            onClick={() => onAdjust(set)}
+                            className="h-10 px-3 text-muted">
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Adjust
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending}
+                            aria-label={`Log planned ${movement.name} set: ${plannedText(set)}`}
+                            onClick={() => onLog(set)}
+                            className="h-10 px-4">
+                            Log
+                          </Button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -496,7 +550,7 @@ export function PlannedSets({
 
 export type Recap = { seconds: number; sets: number; volume: number; prs: number };
 
-/** Shown after Complete Workout: the session's numbers count up once, then it points to the history. */
+/** Shown after Finish: the session's numbers count up once, then it points to the history. */
 export function RecapCard({ recap, onDismiss }: { recap: Recap; onDismiss: () => void }) {
   const [shown, setShown] = useState<Recap>({ seconds: 0, sets: 0, volume: 0, prs: 0 });
   useEffect(() => {
