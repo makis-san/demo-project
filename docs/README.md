@@ -5,5 +5,5 @@ The README's stretch goals, answered in writing. Each one says what was found, w
 | Stretch goal               | Write-up                                                       |
 | -------------------------- | -------------------------------------------------------------- |
 | Data model and performance | [data-model-and-performance.md](data-model-and-performance.md) |
-| Security                   | Coming in a later batch                                        |
+| Security                   | [security.md](security.md)                                     |
 | UI polish                  | Coming in a later batch                                        |
