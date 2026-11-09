@@ -211,6 +211,43 @@ function slotArcs(slots: SetSlot[]) {
   });
 }
 
+/** What the legend lists: each movement worked, with its time, and the planned ones still to come. */
+function legendOf(
+  layout: ReturnType<typeof ringLayout> | null,
+  currentId: string | null,
+  nameOf: (id: string | null) => string,
+  colorOf: (id: string | null) => string,
+) {
+  const legend: LegendItem[] = [];
+  if (layout) {
+    for (const [id, ms] of layout.spent) {
+      legend.push({
+        movementId: id,
+        name: nameOf(id),
+        color: colorOf(id),
+        ms,
+        ghostMs: id === currentId ? layout.currentGhostMs : 0,
+        state: id === currentId ? "current" : "done",
+      });
+    }
+    for (const ghost of layout.ghosts) {
+      const item = legend.find((l) => l.movementId === ghost.movementId);
+      if (item) item.ghostMs = ghost.ms;
+      else
+        legend.push({
+          movementId: ghost.movementId,
+          name: nameOf(ghost.movementId),
+          color: colorOf(ghost.movementId),
+          ms: 0,
+          ghostMs: ghost.ms,
+          state: "upcoming",
+        });
+    }
+  }
+
+  return legend;
+}
+
 type RingProps = {
   timeline: WorkoutTimeline | null;
   title: string;
@@ -240,6 +277,8 @@ type RingProps = {
   complete: boolean;
   /** Opens the sheet to carry on with another movement, which resumes the workout. */
   onAdd: () => void;
+  /** The rest between sets, when one is running: on a phone its countdown is in the middle of the ring. */
+  rest: { startedAt: number; endsAt: number } | null;
 };
 
 const volumeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -351,32 +390,7 @@ export function WorkoutRing(props: RingProps) {
       : `Set ${currentLogged + 1} of ${currentGroup.total}`;
   } else if (currentId) setLine = `Set ${currentLogged + 1}`;
 
-  const legend: LegendItem[] = [];
-  if (layout) {
-    for (const [id, ms] of layout.spent) {
-      legend.push({
-        movementId: id,
-        name: nameOf(id),
-        color: colorOf(id),
-        ms,
-        ghostMs: id === currentId ? layout.currentGhostMs : 0,
-        state: id === currentId ? "current" : "done",
-      });
-    }
-    for (const ghost of layout.ghosts) {
-      const item = legend.find((l) => l.movementId === ghost.movementId);
-      if (item) item.ghostMs = ghost.ms;
-      else
-        legend.push({
-          movementId: ghost.movementId,
-          name: nameOf(ghost.movementId),
-          color: colorOf(ghost.movementId),
-          ms: 0,
-          ghostMs: ghost.ms,
-          state: "upcoming",
-        });
-    }
-  }
+  const legend = legendOf(layout, currentId, nameOf, colorOf);
 
   // The ring only shows what has begun: a movement's sets appear on the inner ring once it has been started. What is
   // still ahead of the plan stays off it, as empty track, and the legend below lists it. What is drawn is then spaced
@@ -438,10 +452,14 @@ export function WorkoutRing(props: RingProps) {
   });
 
   return (
-    <Card role="region" className="enter enter-1 p-2 pb-4 sm:p-6" aria-label="Workout progress">
-      <h3 className="eyebrow px-2 pt-2 sm:p-0">{props.title}</h3>
+    <Card
+      role="region"
+      className="enter enter-1 p-2 pb-4 max-md:border-0 max-md:p-0 max-md:shadow-none max-md:[background:none] max-md:[backdrop-filter:none] sm:p-6"
+      aria-label="Workout progress">
+      <h3 className="text-sm font-medium text-muted max-md:sr-only sm:p-0">{props.title}</h3>
 
-      <div className="@container relative mx-auto mt-1 aspect-square w-full max-w-[min(100%,calc(100dvh-13rem))] sm:mt-3 lg:max-w-[28rem]">
+      {/* On a phone the ring is as wide as the screen, or as tall as is left above the set bar: it is read from a distance. */}
+      <div className="@container relative mx-auto mt-1 aspect-square w-[max(12rem,min(calc(100vw_-_2rem),calc(100dvh_-_var(--composer-h,12.5rem)_-_var(--ring-chrome,14rem))))] sm:mt-3 md:w-full md:max-w-[min(100%,calc(100dvh-13rem))] lg:max-w-[28rem]">
         <svg
           ref={svgRef}
           viewBox="0 0 120 120"
@@ -595,7 +613,12 @@ export function WorkoutRing(props: RingProps) {
         <div className="absolute inset-[21%] flex flex-col items-center justify-center text-center">
           <p
             key={props.complete ? "complete" : paused ? "paused" : "running"}
-            className={cn("eyebrow orbit-swap", props.complete ? "text-ok" : paused && "text-accent")}>
+            className={cn(
+              "orbit-swap text-[max(0.7rem,3.2cqw)] font-medium text-muted max-md:text-[3.6cqw]",
+              props.rest && "max-md:hidden",
+              props.complete && "text-ok",
+              paused && !props.complete && "text-accent",
+            )}>
             {props.complete ? "Plan complete" : paused ? "Paused" : "Workout time"}
           </p>
           <p
@@ -603,18 +626,21 @@ export function WorkoutRing(props: RingProps) {
             aria-label="Workout time"
             className={cn(
               "num mt-[1.5cqw] leading-none font-bold tracking-tight text-chalk font-stretch-[88%]",
-              elapsed >= 3_600_000 ? "text-[13cqw]" : "text-[18cqw]",
+              elapsed >= 3_600_000 ? "text-[13cqw] max-md:text-[14.5cqw]" : "text-[18cqw] max-md:text-[21cqw]",
               paused && "clock-hold",
+              // On a phone a rest takes the middle: its countdown is the big number, and the workout clock is in the top bar.
+              props.rest && "max-md:hidden",
             )}>
             {formatClock(elapsed / 1000)}
           </p>
+          {props.rest && <RestReadout rest={props.rest} />}
           {layout?.plannedMs != null && (
             <p className="num mt-[1cqw] text-[max(0.75rem,3.4cqw)] text-faint">of about {minutes(layout.plannedMs)}</p>
           )}
           <p
             key={currentId ?? "warm-up"}
             data-testid="ring-movement"
-            className="orbit-swap mt-[3cqw] flex max-w-full items-center gap-[1.5cqw] text-[max(1rem,5.2cqw)] font-semibold text-chalk">
+            className="orbit-swap mt-[3cqw] flex max-w-full items-center gap-[1.5cqw] text-[max(1rem,5.2cqw)] font-semibold text-chalk max-md:text-[7cqw]">
             <span
               aria-hidden="true"
               className="h-[0.5em] w-[0.5em] shrink-0 rounded-full"
@@ -625,7 +651,7 @@ export function WorkoutRing(props: RingProps) {
           <p
             key={setLine}
             className={cn(
-              "num orbit-swap text-[max(0.75rem,3.6cqw)]",
+              "num orbit-swap text-[max(0.75rem,3.6cqw)] max-md:text-[4.6cqw]",
               movementDone ? "font-semibold text-ok" : "text-muted",
             )}>
             {setLine}
@@ -648,7 +674,7 @@ export function WorkoutRing(props: RingProps) {
         </div>
       ) : (
         <>
-          <div className="mx-auto mt-3 grid max-w-md grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-1 sm:mt-5 sm:px-0">
+          <div className="mx-auto mt-3 max-md:mt-2 grid max-w-md grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1 sm:mt-5 sm:px-0 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <button
               type="button"
               onClick={() => {
@@ -657,7 +683,7 @@ export function WorkoutRing(props: RingProps) {
               }}
               disabled={props.nextSetPending}
               aria-label={`${nextSetLabel}: ${props.nextSetDetail}`}
-              className="press group flex h-14 min-w-0 items-center justify-center gap-2 rounded-full bg-white/[0.1] px-3 text-chalk transition-colors hover:bg-white/[0.15] disabled:opacity-60">
+              className="press group flex h-14 min-w-0 items-center justify-center gap-2 rounded-full bg-white/[0.1] px-3 text-chalk transition-colors hover:bg-white/[0.15] disabled:opacity-60 max-md:h-12">
               {movesOn ? (
                 <ChevronsRight
                   key="on"
@@ -685,7 +711,7 @@ export function WorkoutRing(props: RingProps) {
               aria-label={paused ? "Resume workout" : "Pause workout"}
               aria-pressed={paused}
               className={cn(
-                "press relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-primary text-primary-ink shadow-[0_10px_30px_-10px_var(--color-primary)] transition-colors hover:bg-primary-strong disabled:opacity-40",
+                "press relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full max-md:h-16 max-md:w-16 bg-primary text-primary-ink shadow-[0_10px_30px_-10px_var(--color-primary)] transition-colors hover:bg-primary-strong disabled:opacity-40",
                 paused && "pause-halo",
               )}>
               {paused ? (
@@ -694,11 +720,12 @@ export function WorkoutRing(props: RingProps) {
                 <Pause key="pause" className="icon-in h-7 w-7" fill="currentColor" />
               )}
             </button>
-            <FinishButton {...props} />
+            {/* On a phone Finish is in the top bar. */}
+            <FinishButton {...props} className="max-md:hidden" />
           </div>
 
           {/* The smaller of the two: on to the next movement. It glows once every planned set of this one is done. */}
-          <div className="mt-3 flex justify-center">
+          <div className={cn("mt-3 flex justify-center max-md:mt-2", props.rest && "max-md:hidden")}>
             <button
               type="button"
               onClick={props.onNext}
@@ -719,51 +746,104 @@ export function WorkoutRing(props: RingProps) {
         </>
       )}
 
-      {legend.length > 0 && (
-        <ol
-          className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-1.5 px-1 sm:mt-5"
-          aria-label="Workout timeline">
-          {legend.map((item) => (
-            <li
-              key={item.movementId ?? "warm-up"}
-              data-section={item.name}
-              data-state={item.state}
-              className={cn(
-                "enter flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1 text-xs transition-colors duration-500",
-                item.state === "upcoming" ? "text-faint" : "text-muted",
-                item.state === "current" && "text-chalk",
-              )}
-              style={
-                item.state === "current"
-                  ? { background: `color-mix(in oklch, ${item.color} 16%, transparent)` }
-                  : undefined
-              }>
-              <span
-                aria-hidden="true"
-                className="h-2.5 w-2.5 shrink-0 rounded-full transition-opacity duration-500"
-                style={
-                  item.state === "upcoming"
-                    ? { boxShadow: `inset 0 0 0 1.5px ${item.color}`, opacity: 0.7 }
-                    : { background: item.color, opacity: item.state === "done" ? 0.6 : 1 }
-                }
-              />
-              <span className={cn("truncate", item.state === "current" && "font-semibold")}>{item.name}</span>
-              <span className="num">
-                {item.ms > 0 && formatClock(item.ms / 1000)}
-                {item.ms > 0 && item.ghostMs > 0 && " · "}
-                {item.ghostMs > 0 && `~${minutes(item.ghostMs)}${item.ms > 0 ? " left" : ""}`}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+      {/* On a phone the legend and the numbers are in the List: the ring has the screen to itself. */}
+      <LegendList legend={legend} className="max-md:hidden" />
 
-      <div className="mx-2 mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 sm:mx-0 sm:mt-5 sm:pt-5 [&_p:first-child]:text-2xl sm:[&_p:first-child]:text-3xl">
+      <div className="mx-2 mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 max-md:hidden sm:mx-0 sm:mt-5 sm:pt-5 [&_p:first-child]:text-2xl sm:[&_p:first-child]:text-3xl">
         <Stat label="Sets" value={props.sets.length} morph />
         <Stat label="Movements" value={new Set(props.sets.map((s) => s.movement.id)).size} morph />
         <Stat label="Volume" value={volumeFormat.format(volumeOf(props.sets))} unit={weightUnit} morph />
       </div>
     </Card>
+  );
+}
+
+/** The rest countdown in the middle of the ring on a phone, big enough to read from where the phone is propped. */
+function RestReadout({ rest }: { rest: { startedAt: number; endsAt: number } }) {
+  const now = useNow(250, true);
+  const remaining = now === null ? null : Math.max(0, (rest.endsAt - now) / 1000);
+  const over = remaining !== null && remaining <= 0;
+  return (
+    <div aria-hidden="true" className="orbit-swap flex flex-col items-center md:hidden">
+      <p className={cn("text-[3.6cqw] font-medium", over ? "text-ok" : "text-muted")}>{over ? "Rest over" : "Rest"}</p>
+      <p
+        className={cn(
+          "num mt-[1.5cqw] text-[21cqw] leading-none font-bold tracking-tight font-stretch-[88%]",
+          over ? "text-ok" : "text-chalk",
+        )}>
+        {formatClock(Math.ceil(remaining ?? (rest.endsAt - rest.startedAt) / 1000))}
+      </p>
+    </div>
+  );
+}
+
+function LegendList({ legend, className }: { legend: LegendItem[]; className?: string }) {
+  if (legend.length === 0) return null;
+  return (
+    <ol
+      className={cn("mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-1.5 px-1 sm:mt-5", className)}
+      aria-label="Workout timeline">
+      {legend.map((item) => (
+        <li
+          key={item.movementId ?? "warm-up"}
+          data-section={item.name}
+          data-state={item.state}
+          className={cn(
+            "enter flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1 text-xs transition-colors duration-500",
+            item.state === "upcoming" ? "text-faint" : "text-muted",
+            item.state === "current" && "text-chalk",
+          )}
+          style={
+            item.state === "current" ? { background: `color-mix(in oklch, ${item.color} 16%, transparent)` } : undefined
+          }>
+          <span
+            aria-hidden="true"
+            className="h-2.5 w-2.5 shrink-0 rounded-full transition-opacity duration-500"
+            style={
+              item.state === "upcoming"
+                ? { boxShadow: `inset 0 0 0 1.5px ${item.color}`, opacity: 0.7 }
+                : { background: item.color, opacity: item.state === "done" ? 0.6 : 1 }
+            }
+          />
+          <span className={cn("truncate", item.state === "current" && "font-semibold")}>{item.name}</span>
+          <span className="num">
+            {item.ms > 0 && formatClock(item.ms / 1000)}
+            {item.ms > 0 && item.ghostMs > 0 && " · "}
+            {item.ghostMs > 0 && `~${minutes(item.ghostMs)}${item.ms > 0 ? " left" : ""}`}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The ring's legend on its own, for the List pane on a phone: it works out the same layout from the same inputs. */
+export function TimelineLegend(
+  props: Pick<RingProps, "timeline" | "plan" | "sets" | "names" | "colors" | "defaultRestSeconds">,
+) {
+  const { timeline } = props;
+  const paused = timeline ? isPaused(timeline) : false;
+  const now = useNow(1000, !paused);
+  const at = timeline && now !== null ? (paused ? pausedNow(timeline) : now) : null;
+  const layout =
+    timeline && at !== null
+      ? ringLayout(timeline, at, plannedGroups(props.plan), loggedCounts(props.sets), props.defaultRestSeconds)
+      : null;
+  const currentId = timeline ? currentSection(timeline).movementId : null;
+  const nameOf = (id: string | null) => (id === null ? "Warm-up" : (props.names.get(id) ?? "Movement"));
+  const colorOf = (id: string | null) => props.colors.get(id) ?? warmUpColor;
+  return <LegendList legend={legendOf(layout, currentId, nameOf, colorOf)} className="md:hidden" />;
+}
+
+/** Sets, movements and volume of the session in one small line: the ring's numbers, for the List pane on a phone. */
+export function SessionNumbers({ sets }: { sets: LoggedSet[] }) {
+  const movements = new Set(sets.map((s) => s.movement.id)).size;
+  return (
+    <p className="num px-1 text-sm text-muted md:hidden">
+      <span className="font-semibold text-chalk">{sets.length}</span> {sets.length === 1 ? "set" : "sets"} ·{" "}
+      <span className="font-semibold text-chalk">{movements}</span> {movements === 1 ? "movement" : "movements"} ·{" "}
+      <span className="font-semibold text-chalk">{volumeFormat.format(volumeOf(sets))}</span> {weightUnit}
+    </p>
   );
 }
 
@@ -793,7 +873,7 @@ function Hole(props: { id: string; radius: number; width: number; line: number; 
 }
 
 /** Finish, a chequered flag. Big once the plan is done and it is the main thing left to do. */
-function FinishButton(props: { onFinish: () => void; finishing: boolean; big?: boolean }) {
+function FinishButton(props: { onFinish: () => void; finishing: boolean; big?: boolean; className?: string }) {
   return (
     <button
       type="button"
@@ -803,6 +883,7 @@ function FinishButton(props: { onFinish: () => void; finishing: boolean; big?: b
       className={cn(
         "press flag-button group relative flex min-w-0 items-center justify-center overflow-hidden rounded-full border border-white/25 disabled:opacity-60",
         props.big ? "h-[4.5rem] flex-1" : "h-14",
+        props.className,
       )}>
       <span aria-hidden="true" className="checkered absolute inset-0" />
       <span

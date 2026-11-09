@@ -449,7 +449,9 @@ test.describe("Workout ring on a phone", () => {
     await expect(clock(page)).toBeInViewport();
   });
 
-  test("should slide back to the set form when a planned set is adjusted from the list", async ({ page }) => {
+  test("should adjust a planned set from the list with the set bar still there, and the numbers filled in", async ({
+    page,
+  }) => {
     await startPlanned(page);
     await page.getByRole("tab", { name: /^List/ }).click();
     await page
@@ -457,8 +459,12 @@ test.describe("Workout ring on a phone", () => {
       .first()
       .click();
 
-    await expect(page.getByRole("tab", { name: "Ring" })).toHaveAttribute("aria-selected", "true");
+    // The set bar is at the bottom of both panes, so there is nowhere to slide to: the List stays, and the bar has the
+    // movement and the planned set's numbers.
+    await expect(page.getByRole("tab", { name: /^List/ })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("group", { name: "Selected movement" })).toContainText("Overhead Press");
     await expect(page.getByLabel("Reps", { exact: true })).toBeInViewport();
+    await expect(page.getByLabel("Reps", { exact: true })).not.toHaveValue("");
+    await expect(page.getByLabel("Weight", { exact: true })).not.toHaveValue("");
   });
 });

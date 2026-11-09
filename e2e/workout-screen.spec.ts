@@ -345,3 +345,42 @@ test.describe("Ending a workout: the confetti", () => {
     });
   });
 });
+
+test.describe("Current workout: the numbers a movement starts from", () => {
+  test("should fill in the last top set from an earlier workout when the movement is picked", async ({ page }) => {
+    await completeWorkout(page, [
+      { movement: "Bench Press", weight: 100, reps: 8 },
+      { movement: "Bench Press", weight: 105, reps: 3 },
+    ]);
+    await startWorkout(page);
+    await selectMovement(page, "Bench Press");
+
+    // The heaviest set of the last time: 105 for 3. The history answers a moment after the form shows.
+    await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("105");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("3");
+    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeEnabled();
+  });
+
+  test("should start from this session's last set when the movement is picked again, over the history", async ({
+    page,
+  }) => {
+    await completeWorkout(page, [{ movement: "Bench Press", weight: 100, reps: 5 }]);
+    await startWorkout(page);
+    await addSet(page, { movement: "Bench Press", weight: 120, reps: 4 });
+    await addSet(page, { movement: "Back Squat", weight: 150, reps: 6 });
+
+    // Back to Bench Press from the sheet: 120 for 4 from this session, not the 100 for 5 of the last workout.
+    await selectMovement(page, "Bench Press");
+    await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("120");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("4");
+  });
+
+  test("should leave the fields empty for a movement never trained", async ({ page }) => {
+    await startWorkout(page);
+    await selectMovement(page, "Bench Press");
+
+    await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("");
+    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  });
+});

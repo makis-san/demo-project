@@ -34,31 +34,79 @@ test.describe("Phone, signed in", () => {
   test("should log a set with every control inside the window", async ({ page }) => {
     await startWorkout(page);
 
-    // The button for an extra movement is on the screen and big enough to tap.
+    // With no movement the bar at the bottom is one big button, on the screen and big enough to tap.
     const addMovementButton = await page.getByRole("button", { name: "Add movement", exact: true }).boundingBox();
     expect(addMovementButton!.x).toBeGreaterThanOrEqual(0);
     expect(addMovementButton!.x + addMovementButton!.width).toBeLessThanOrEqual(phone.width);
-    expect(addMovementButton!.height).toBeGreaterThanOrEqual(36);
+    expect(addMovementButton!.y + addMovementButton!.height).toBeLessThanOrEqual(phone.height);
+    expect(addMovementButton!.height).toBeGreaterThanOrEqual(44);
     await selectMovement(page, "Bench Press");
 
-    // Each control has the whole width, and the Add button is on the screen and not too small to tap.
-    for (const control of [
-      page.getByRole("group", { name: "Selected movement" }),
-      page.getByLabel("Weight", { exact: true }),
-      page.getByLabel("Reps", { exact: true }),
-    ]) {
-      const box = await control.boundingBox();
-      expect(box!.x).toBeGreaterThanOrEqual(0);
-      expect(box!.x + box!.width).toBeLessThanOrEqual(phone.width);
-      expect(box!.width).toBeGreaterThan(phone.width / 2);
+    // Weight, reps and Add are all on the first screen, with no scrolling, and each is big enough to tap.
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const weight = (await page.getByLabel("Weight", { exact: true }).boundingBox())!;
+    const reps = (await page.getByLabel("Reps", { exact: true }).boundingBox())!;
+    const add = (await page.getByRole("button", { name: "Add", exact: true }).boundingBox())!;
+    for (const box of [weight, reps, add]) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(phone.width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(phone.height);
+      expect(box.height).toBeGreaterThanOrEqual(44);
     }
-    const add = await page.getByRole("button", { name: "Add", exact: true }).boundingBox();
-    expect(add!.x + add!.width).toBeLessThanOrEqual(phone.width);
-    expect(add!.height).toBeGreaterThanOrEqual(40);
+    // Weight and reps are side by side, and Add takes at least half of the width.
+    expect(weight.x + weight.width).toBeLessThanOrEqual(reps.x);
+    expect(Math.abs(weight.y - reps.y)).toBeLessThan(2);
+    expect(add.width).toBeGreaterThanOrEqual(phone.width / 2);
+    // The movement is a row to tap, to change it.
+    const row = (await page.getByRole("button", { name: /^Change movement/ }).boundingBox())!;
+    expect(row.x + row.width).toBeLessThanOrEqual(phone.width);
+    expect(row.height).toBeGreaterThanOrEqual(44);
 
     await addSet(page, { movement: "Bench Press", weight: 100, reps: 5 });
     await expect(setRows(page)).toContainText("5 reps × 100 lbs");
     await expectNoSidewaysScroll(page);
+  });
+
+  test("should hide the dock during a workout, and bring it back on Home with Resume", async ({ page }) => {
+    const dock = page.getByRole("navigation", { name: "Main" });
+    // No workout: the empty state has the dock.
+    await goTo(page, "Current Workout");
+    await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
+    await expect(dock).toBeVisible();
+
+    await startWorkout(page);
+    // The workout is the whole screen: no dock, a top bar instead, and the h1 is still there for a screen reader.
+    await expect(dock).toBeHidden();
+    await expect(page.getByRole("link", { name: "Current Workout", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Current Workout" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(1);
+    const minimize = page.getByRole("link", { name: "Minimize workout" });
+    const box = (await minimize.boundingBox())!;
+    expect(box.y).toBeLessThan(phone.height / 8);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+
+    // Minimize leaves without ending it: Home has the workout to resume, and the dock is back.
+    await minimize.click();
+    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByRole("link", { name: "Resume workout" })).toBeVisible();
+    await expect(dock).toBeVisible();
+    await expect(dock.getByRole("link")).toHaveCount(5);
+
+    // Resume goes back to the focus screen, and a reload on it has no dock either (the server and browser agree).
+    await page.getByRole("link", { name: "Resume workout" }).click();
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
+    await expect(dock).toBeHidden();
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
+    await expect(dock).toBeHidden();
+    // The clock ticks once the page has hydrated, and only then does Finish do anything.
+    await expect(page.getByRole("timer", { name: "Workout time" })).not.toHaveText("0:00");
+
+    // Finishing ends the focus: the empty state has the dock again.
+    await page.getByRole("button", { name: "Finish Workout" }).click();
+    await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
+    await expect(dock).toBeVisible();
   });
 
   test("should bring up a number keypad for weight and reps", async ({ page }) => {
@@ -102,13 +150,46 @@ test.describe("Phone, signed in", () => {
     await page.goto("/workout-history");
     await expect(page.getByRole("heading", { level: 1, name: "Workout History" })).toBeVisible();
     await expect(page.getByRole("img", { name: /over time$/ })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: names[3] })).toBeVisible();
     await expectNoSidewaysScroll(page);
 
-    // The wide table moves inside its card, not the page.
-    const table = page.locator("div.overflow-x-auto").filter({ has: page.getByRole("table") });
-    const { client, scroll } = await table.evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
-    expect(scroll).toBeGreaterThan(client);
+    // The completed workouts are a list on a phone, not the wide table: a row each, inside the window, grouped by week.
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await expect(page.getByRole("columnheader")).toHaveCount(0);
+    const journal = page.getByRole("region", { name: /^(This week|Last week|\w{3} \d+ – )/ }).first();
+    const rows = journal.getByRole("listitem");
+    await expect(rows.first()).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 3, name: /^(This week|Last week|[A-Z][a-z]{2} \d+ – )/ }).first(),
+    ).toBeVisible();
+    const first = (await rows.first().boundingBox())!;
+    expect(first.x).toBeGreaterThanOrEqual(0);
+    expect(first.x + first.width).toBeLessThanOrEqual(phone.width);
+    expect(first.height).toBeGreaterThanOrEqual(44);
+    await expect(rows.first()).toContainText("sets");
+    await expectNoSidewaysScroll(page);
+
+    // Tap a row to open its sets.
+    await rows.first().getByRole("button", { name: "Show the sets of this workout" }).click();
+    await expect(rows.first().getByRole("group", { name: "Sets of this workout" })).toBeVisible();
+    await expect(rows.first().getByRole("button", { name: "Repeat this workout" })).toBeVisible();
+    await expectNoSidewaysScroll(page);
+
+    // Select turns on the checkboxes and a bar to delete the chosen ones.
+    await expect(page.getByRole("checkbox", { name: "Select workout" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+    const boxes = page.getByRole("checkbox", { name: "Select workout" });
+    await expect(boxes.first()).toBeAttached();
+    expect(await boxes.count()).toBe(5);
+    await boxes.first().check();
+    const del = page.getByRole("button", { name: "Delete Selected (1)" });
+    await expect(del).toBeVisible();
+    const delBox = (await del.boundingBox())!;
+    expect(delBox.x + delBox.width).toBeLessThanOrEqual(phone.width);
+    expect(delBox.y + delBox.height).toBeLessThanOrEqual(phone.height);
+    await del.click();
+    await expect(page.getByRole("checkbox", { name: "Select workout" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Select", exact: true })).toBeVisible();
+    await expect(page.locator("li").filter({ hasText: /sets · / })).toHaveCount(4);
   });
 
   test("should have a dock of five, with the workout raised in the middle", async ({ page }) => {

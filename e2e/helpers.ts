@@ -8,6 +8,12 @@ type Section = "Home" | "Current Workout" | "Workout Library" | "Workout History
  */
 export async function goTo(page: Page, section: Section) {
   const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  // A workout in progress is a focus screen on a phone, with no dock: Minimize is the way out, to Home.
+  const minimize = page.getByRole("link", { name: "Minimize workout" });
+  if (phone && (await minimize.isVisible())) {
+    await minimize.click();
+    await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
+  }
   if (phone && (section === "Movements" || section === "Workout Library")) {
     const tab = page
       .getByRole("navigation", { name: "Library" })
@@ -42,7 +48,9 @@ export function movementRow(page: Page, name: string) {
  * tap the movement. The set form then shows for it.
  */
 export async function selectMovement(page: Page, name: string) {
-  await page.getByRole("button", { name: "Add movement", exact: true }).click();
+  // On a phone the bar at the bottom is "Add movement" until a movement is picked, then a row that changes it. On a
+  // desktop it is the "+" at the top. Only one of them is on the screen at a time.
+  await page.getByRole("button", { name: /^(Add movement$|Change movement)/ }).click();
   const sheet = page.getByRole("dialog", { name: "Choose a movement" });
   await sheet.getByRole("searchbox", { name: "Search movements" }).fill(name);
   await sheet.getByRole("button", { name, exact: true }).click();

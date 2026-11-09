@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, Plus, Repeat2, SlidersHorizontal, Trophy, X } from "lucide-react";
+import { Check, ChevronDown, ChevronsUpDown, Flag, Plus, Repeat2, SlidersHorizontal, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { StepButton, stepValue } from "@/components/stepper";
 import { RestLengthButton, type RestTimerState } from "@/components/rest-timer";
 import { SetValues } from "@/components/set-values";
 import type { MovementOption } from "@/components/movement-card";
-import { formatClock } from "@/lib/use-now";
+import { formatClock, useNow } from "@/lib/use-now";
+import { elapsedMs, isPaused, type WorkoutTimeline } from "@/lib/workout-timeline";
 import { weightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ export type LoggedSet = {
 };
 
 /** What the history says about a movement, from its completed workouts. */
-export type MovementHistory = { lastTop: number; lastDay: string; best: number } | null;
+export type MovementHistory = { lastTop: number; lastTopReps: number; lastDay: string; best: number } | null;
 
 const numberFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const volumeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -53,6 +54,71 @@ export function personalRecords(sets: LoggedSet[], history: Map<string, Movement
 
 /* ------------------------------------------------------------------------------------------------------------ */
 
+/**
+ * The top of the focus screen on a phone, in place of the page header: a button that leaves without ending the
+ * workout, the workout clock, and Finish. The clock shows the same time as the ring's, pauses left out.
+ */
+export function PhoneTopBar({
+  timeline,
+  startedAt,
+  onFinish,
+  finishing,
+  showFinish,
+}: {
+  timeline: WorkoutTimeline | null;
+  startedAt: Date | string;
+  onFinish: () => void;
+  finishing: boolean;
+  /** Not when the ring offers a big Finish of its own. */
+  showFinish: boolean;
+}) {
+  const paused = timeline ? isPaused(timeline) : false;
+  const now = useNow(1000, true);
+  // Before the browser takes over there is no clock, so the server and the browser agree on 0:00. While paused the
+  // clock stands at the moment the pause began.
+  const at = timeline && paused ? timeline.pauses[timeline.pauses.length - 1].startedAt : now;
+  const elapsed =
+    at === null ? 0 : timeline ? elapsedMs(timeline, at) : Math.max(0, at - new Date(startedAt).getTime());
+  return (
+    <div className="sticky top-0 z-20 -mx-4 mb-3 grid grid-cols-[3rem_1fr_auto] items-center gap-2 bg-ground/85 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 backdrop-blur-md md:hidden">
+      <Link
+        to="/home"
+        aria-label="Minimize workout"
+        title="Minimize workout"
+        className="press grid h-11 w-11 place-items-center rounded-full bg-white/[0.07] text-chalk">
+        <ChevronDown className="h-5 w-5" />
+      </Link>
+      <p
+        aria-hidden="true"
+        className={cn(
+          "num text-center text-xl font-bold tracking-tight text-chalk font-stretch-[88%]",
+          paused && "text-accent",
+        )}>
+        {formatClock(elapsed / 1000)}
+        {paused && <span className="ml-2 text-xs font-medium">Paused</span>}
+      </p>
+      {showFinish ? (
+        <button
+          type="button"
+          onClick={onFinish}
+          disabled={finishing}
+          aria-label={finishing ? "Finishing..." : "Finish Workout"}
+          className="press flag-button relative flex h-11 items-center justify-center overflow-hidden rounded-full border border-white/25 disabled:opacity-60">
+          <span aria-hidden="true" className="checkered absolute inset-0" />
+          <span className="relative inline-flex items-center gap-1.5 rounded-full bg-ground/90 px-3 py-1.5 text-sm font-semibold text-chalk">
+            <Flag className="h-4 w-4" fill="currentColor" />
+            {finishing ? "Finishing..." : "Finish"}
+          </span>
+        </button>
+      ) : (
+        <span className="w-11" />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------------------ */
+
 type ComposerProps = {
   selectedMovement: MovementOption;
   weight: string;
@@ -70,29 +136,95 @@ type ComposerProps = {
   timer: RestTimerState;
 };
 
+const shortHint = (history: MovementHistory | undefined) => {
+  if (history === null) return "First time logging this one";
+  // A body-weight movement with nothing added was lifted at 0: say the reps, not "0 lbs".
+  if (history) {
+    const top =
+      history.lastTop > 0 ? `${numberFormat.format(history.lastTop)} ${weightUnit}` : `${history.lastTopReps} reps`;
+    return `Last top set ${top} · ${formatDay(history.lastDay)}`;
+  }
+  return " ";
+};
+
+/** The Add button of both composers: the one red button of the screen. */
+function AddButton({ composer, className }: { composer: ComposerProps; className?: string }) {
+  return (
+    <Button
+      type="submit"
+      disabled={!composer.reps || !composer.weight}
+      className={cn("h-12 flex-1 text-base", className)}>
+      <Plus className="h-5 w-5" />
+      {composer.isPending ? "Adding..." : "Add"}
+      {!composer.isPending && (
+        <span aria-hidden="true" className="num font-medium opacity-70">
+          · set {composer.nextSetNumber}
+        </span>
+      )}
+    </Button>
+  );
+}
+
+/** The weight and reps fields, with the − and + beside each. The same fields in both composers, so tests find one. */
+function weightField(composer: ComposerProps, className: string) {
+  return (
+    <Input
+      type="number"
+      aria-label="Weight"
+      placeholder="–"
+      inputMode="decimal"
+      value={composer.weight}
+      onChange={(e) => composer.onWeightChange(e.target.value)}
+      min={0}
+      max={9999.99}
+      step="0.01"
+      className={className}
+    />
+  );
+}
+function repsField(composer: ComposerProps, className: string) {
+  return (
+    <Input
+      type="number"
+      aria-label="Reps"
+      placeholder="–"
+      inputMode="numeric"
+      value={composer.reps}
+      onChange={(e) => composer.onRepsChange(e.target.value)}
+      min={1}
+      max={1000}
+      className={className}
+    />
+  );
+}
+const weightSteps = (composer: ComposerProps) => ({
+  onDown: () => composer.onWeightChange(stepValue(composer.weight, -5, { start: composer.startWeight })),
+  onUp: () => composer.onWeightChange(stepValue(composer.weight, 5, { start: composer.startWeight })),
+  downText: "5 less weight",
+  upText: "5 more weight",
+});
+const repsSteps = (composer: ComposerProps) => ({
+  onDown: () => composer.onRepsChange(stepValue(composer.reps, -1, { min: 1, start: composer.startReps ?? 5 })),
+  onUp: () => composer.onRepsChange(stepValue(composer.reps, 1, { min: 1, start: composer.startReps ?? 5 })),
+  downText: "One rep less",
+  upText: "One rep more",
+});
+
 /**
- * Logging a set, built for one thumb between sets: nudge weight and reps with − and + (hold to run), then Add. It is for
- * the movement picked with "Add movement", from a chip of this session, or from "Adjust" on a planned set. The movement
+ * Logging a set from md up, in the page: nudge weight and reps with − and + (hold to run), then Add. It is for the
+ * movement picked with "Add movement", from a chip of this session, or from "Adjust" on a planned set. The movement
  * is not chosen here: the sheet that picks it is opened from the page's "Add movement" button.
  */
 export function SetComposer(props: ComposerProps) {
   const selected = props.selectedMovement;
-  const canAdd = !!props.reps && !!props.weight;
-
-  let hint = " ";
-  if (props.history === null) hint = "First time logging this one";
-  else if (props.history)
-    hint = `Last top set ${numberFormat.format(props.history.lastTop)} ${weightUnit} · ${formatDay(props.history.lastDay)} · Best ${numberFormat.format(props.history.best)}`;
+  let hint = shortHint(props.history);
+  if (props.history) hint += ` · Best ${numberFormat.format(props.history.best)}`;
 
   return (
     <Card className="enter enter-2 z-10 p-3 sm:p-4">
       <form onSubmit={props.onSubmit} className="space-y-3">
-        <div
-          role="group"
-          aria-label="Selected movement"
-          className="rounded-[1.25rem] border border-line bg-black/25 px-4 py-3.5">
-          <p className="eyebrow">Movement</p>
-          <p className="mt-1 truncate text-xl font-semibold tracking-tight text-chalk font-stretch-[108%]">
+        <div role="group" aria-label="Selected movement" className="rounded-[1.25rem] bg-black/25 px-4 py-3.5">
+          <p className="truncate text-xl font-semibold tracking-tight text-chalk font-stretch-[108%]">
             {selected.name}
           </p>
           <p className="num mt-0.5 min-h-4 truncate text-xs text-muted">{hint}</p>
@@ -100,62 +232,138 @@ export function SetComposer(props: ComposerProps) {
 
         <NumberDial
           label={`Weight · ${weightUnit}`}
-          field={
-            <Input
-              type="number"
-              aria-label="Weight"
-              placeholder="–"
-              inputMode="decimal"
-              value={props.weight}
-              onChange={(e) => props.onWeightChange(e.target.value)}
-              min={0}
-              max={9999.99}
-              step="0.01"
-              className={dialInputClass}
-            />
-          }
-          onDown={() => props.onWeightChange(stepValue(props.weight, -5, { start: props.startWeight }))}
-          onUp={() => props.onWeightChange(stepValue(props.weight, 5, { start: props.startWeight }))}
-          downText="5 less weight"
-          upText="5 more weight"
+          field={weightField(props, dialInputClass)}
+          {...weightSteps(props)}
         />
-        <NumberDial
-          label="Reps"
-          field={
-            <Input
-              type="number"
-              aria-label="Reps"
-              placeholder="–"
-              inputMode="numeric"
-              value={props.reps}
-              onChange={(e) => props.onRepsChange(e.target.value)}
-              min={1}
-              max={1000}
-              className={dialInputClass}
-            />
-          }
-          onDown={() => props.onRepsChange(stepValue(props.reps, -1, { min: 1, start: props.startReps ?? 5 }))}
-          onUp={() => props.onRepsChange(stepValue(props.reps, 1, { min: 1, start: props.startReps ?? 5 }))}
-          downText="One rep less"
-          upText="One rep more"
-        />
+        <NumberDial label="Reps" field={repsField(props, dialInputClass)} {...repsSteps(props)} />
 
         {props.needsBodyWeight}
 
         <div className="flex gap-2 pt-1">
           <RestLengthButton timer={props.timer} />
-          <Button type="submit" disabled={!canAdd} className="h-12 flex-1 text-base">
-            <Plus className="h-5 w-5" />
-            {props.isPending ? "Adding..." : "Add"}
-            {selected && !props.isPending && (
-              <span aria-hidden="true" className="num font-medium opacity-70">
-                · set {props.nextSetNumber}
-              </span>
-            )}
-          </Button>
+          <AddButton composer={props} />
         </div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * The composer on a phone: a bar fixed to the bottom of the screen, in both panes. With a movement it is a row to
+ * change it (name and last top set), weight and reps side by side, and Add with the rest length. Without one it is a
+ * single "Add movement" button. It reports its height, so the page leaves room under its content and the rest timer
+ * floats just above it.
+ */
+export function PhoneComposer({
+  composer,
+  onChoose,
+  onHeight,
+}: {
+  composer: (Omit<ComposerProps, "selectedMovement"> & { selectedMovement: MovementOption | null }) | null;
+  onChoose: () => void;
+  onHeight: (px: number) => void;
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  const onHeightRef = useRef(onHeight);
+  onHeightRef.current = onHeight;
+  useEffect(() => {
+    const el = bar.current;
+    if (!el) return;
+    const report = () => onHeightRef.current(el.offsetHeight);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      onHeightRef.current(0);
+    };
+  }, []);
+
+  const selected = composer?.selectedMovement ?? null;
+  const full = selected ? ({ ...composer, selectedMovement: selected } as ComposerProps) : null;
+
+  return (
+    <div ref={bar} className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+      <div className="glass glass-strong rounded-t-[1.5rem] rounded-b-none border-x-0 border-b-0 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {full && selected ? (
+          <form onSubmit={full.onSubmit} className="space-y-2">
+            <div role="group" aria-label="Selected movement">
+              <button
+                type="button"
+                onClick={onChoose}
+                aria-label={`Change movement, ${selected.name}`}
+                className="press flex min-h-11 w-full items-center gap-3 rounded-2xl px-1 text-left">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base leading-tight font-semibold text-chalk font-stretch-[108%]">
+                    {selected.name}
+                  </span>
+                  <span className="num block min-h-4 truncate text-xs text-muted">{shortHint(full.history)}</span>
+                </span>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <CompactDial
+                label={`Weight · ${weightUnit}`}
+                field={weightField(full, compactInputClass)}
+                {...weightSteps(full)}
+              />
+              <CompactDial label="Reps" field={repsField(full, compactInputClass)} {...repsSteps(full)} />
+            </div>
+            {full.needsBodyWeight}
+            <div className="flex gap-2">
+              <RestLengthButton timer={full.timer} compact />
+              <AddButton composer={full} />
+            </div>
+          </form>
+        ) : (
+          <Button type="button" size="lg" onClick={onChoose} className="w-full">
+            <Plus className="h-5 w-5" />
+            Add movement
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const compactInputClass =
+  "h-11 rounded-xl border-transparent bg-transparent px-0 text-center text-xl font-bold tracking-tight font-stretch-[88%] " +
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none " +
+  "hover:border-transparent focus-visible:bg-black/30";
+
+function CompactDial({
+  label,
+  field,
+  onDown,
+  onUp,
+  downText,
+  upText,
+}: {
+  label: string;
+  field: React.ReactNode;
+  onDown: () => void;
+  onUp: () => void;
+  downText: string;
+  upText: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-black/25 px-1 pt-1.5 pb-1">
+      <p
+        className="text-center text-[11px] leading-none text-muted [@media(max-height:700px)]:hidden"
+        aria-hidden="true">
+        {label}
+      </p>
+      <div className="mt-1 flex items-center">
+        <StepButton direction="down" onStep={onDown} className="h-11 w-11 border-transparent bg-transparent">
+          {downText}
+        </StepButton>
+        <div className="min-w-0 flex-1">{field}</div>
+        <StepButton direction="up" onStep={onUp} className="h-11 w-11 border-transparent bg-transparent">
+          {upText}
+        </StepButton>
+      </div>
+    </div>
   );
 }
 
@@ -174,7 +382,7 @@ export function RecentMovements({
 }) {
   return (
     <div className="-mx-1 overflow-x-auto px-1 pb-1">
-      <p className="eyebrow mb-2 px-1">This session</p>
+      <p className="mb-2 px-1 text-[13px] font-medium text-muted">This session</p>
       <div className="flex gap-2 pb-1">
         {recent.map(({ movement, last }) => (
           <button
@@ -219,8 +427,8 @@ function NumberDial({
   upText: string;
 }) {
   return (
-    <div className="rounded-[1.25rem] border border-line bg-black/25 px-2 pt-2.5 pb-2">
-      <p className="eyebrow text-center" aria-hidden="true">
+    <div className="rounded-[1.25rem] bg-black/25 px-2 pt-2.5 pb-2">
+      <p className="text-center text-[13px] text-muted" aria-hidden="true">
         {label}
       </p>
       <div className="mt-1 flex items-center gap-2">
@@ -420,7 +628,7 @@ export function PlannedSets({
     <Card role="region" className="enter p-2 sm:p-3" aria-label="Planned sets">
       <div className="flex items-center justify-between gap-3 px-3 pt-2 pb-3">
         <div className="min-w-0">
-          <p className="eyebrow">Planned from {source}</p>
+          <p className="text-[13px] text-muted">Planned from {source}</p>
           <p className="num text-base font-semibold tracking-tight text-chalk font-stretch-[108%]">
             {done.size} of {plan.length} logged
           </p>
@@ -562,7 +770,7 @@ export function RecapCard({ recap, onDismiss }: { recap: Recap; onDismiss: () =>
     <Card className="enter overflow-hidden border-ok/30 p-5 sm:p-7">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">
-          <p className="eyebrow text-ok">Workout saved</p>
+          <p className="text-sm font-medium text-ok">Workout saved</p>
           <p className="text-2xl font-bold tracking-tight text-chalk font-stretch-[115%]">Session complete</p>
         </div>
         <Button variant="ghost" size="icon" onClick={onDismiss} className="-mt-1 -mr-2 text-faint">

@@ -1,5 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library } from "lucide-react";
+import { currentWorkoutQueryOptions } from "./_layout.current-workout/-queries/current-workout";
 import { useLogout } from "@/lib/use-logout";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -59,6 +61,11 @@ function RouteComponent() {
   const { user } = Route.useRouteContext();
   const displayName = user.name || user.email;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // A workout in progress on its own page is a focus screen on a phone: the dock goes, and the page has its own top bar
+  // and a bar for the set at the bottom. This reads the workout the page's loader put in the cache (it only observes,
+  // it never fetches), so the server and the browser agree and the dock never flashes. From md up nothing hides.
+  const { data: activeWorkout } = useQuery({ ...currentWorkoutQueryOptions(), enabled: false });
+  const focus = !!activeWorkout && pathname.replace(/\/$/, "") === "/current-workout";
   return (
     <div className="min-h-dvh md:flex md:gap-6 md:p-4">
       {/* The sidebar, from md up. */}
@@ -107,7 +114,10 @@ function RouteComponent() {
       {/* The dock, below md: five items, the workout raised in the middle. */}
       <nav
         aria-label="Main"
-        className="glass glass-strong fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 grid grid-cols-5 rounded-[1.5rem] px-1.5 pb-1.5 md:hidden">
+        className={cn(
+          "glass glass-strong fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 grid grid-cols-5 rounded-[1.5rem] px-1.5 pb-1.5 md:hidden",
+          focus && "hidden",
+        )}>
         {dockItems.map((item) => {
           const active = isOn(pathname, item);
           const main = item.to === "/current-workout";
@@ -149,7 +159,11 @@ function RouteComponent() {
         })}
       </nav>
 
-      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pt-6 pb-32 md:px-2 md:pt-8 md:pb-10">
+      <main
+        className={cn(
+          "mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pt-6 md:px-2 md:pt-8 md:pb-10",
+          focus ? "max-md:pt-0 max-md:pb-6" : "pb-32",
+        )}>
         <Outlet />
       </main>
     </div>
