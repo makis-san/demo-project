@@ -1,11 +1,12 @@
-import { LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
+import { LogOut, UserRound } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/lib/use-logout";
 
 /**
- * The account on a phone: a round button with the user's initial that opens who is signed in and Log out. The sidebar
- * has Log out from md up, so this is hidden there.
+ * The account on a phone: a round button with the user's initial that opens who is signed in, the Account page and
+ * Log out. The dock has no room for Account, and the sidebar has both from md up, so this is hidden there.
  */
 export function AccountMenu({ name, email }: { name: string | null; email: string }) {
   const logout = useLogout();
@@ -24,6 +25,10 @@ export function AccountMenu({ name, email }: { name: string | null; email: strin
             {name && <p className="truncate text-sm font-semibold text-chalk">{name}</p>}
             <p className="truncate text-sm text-muted">{email}</p>
           </div>
+          <Link to="/account" className={buttonClasses({ variant: "outline", className: "mb-2 w-full" })}>
+            <UserRound className="h-4 w-4" />
+            Account settings
+          </Link>
           <Button variant="outline" className="w-full" onClick={() => logout.mutate()} disabled={logout.isPending}>
             <LogOut className="h-4 w-4" />
             Log out

@@ -241,6 +241,17 @@ test.describe("Phone, signed in", () => {
     await expect(page.getByRole("navigation", { name: "Library" })).toHaveCount(0);
   });
 
+  test("should open the Account page from the menu on Home, and fit it with the deletion confirmation open", async ({
+    page,
+  }) => {
+    // The dock has five and no room for Account: it is in the round account menu on Home, next to Log out.
+    await goTo(page, "Account");
+    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveCount(5);
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await expect(page.getByRole("group", { name: "Confirm account deletion" })).toBeVisible();
+    await expectNoSidewaysScroll(page);
+  });
+
   test("should reach every page from the dock, and log out from the account menu on Home", async ({ page }) => {
     for (const section of ["Workout History", "Movements", "Body Weight", "Current Workout", "Home"] as const) {
       await goTo(page, section);

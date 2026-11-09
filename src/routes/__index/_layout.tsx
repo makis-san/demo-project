@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library } from "lucide-react";
+import { Dumbbell, History, BicepsFlexed, Scale, LogOut, House, Library, UserRound } from "lucide-react";
 import { currentWorkoutQueryOptions } from "./_layout.current-workout/-queries/current-workout";
 import { useLogout } from "@/lib/use-logout";
 import { Logo } from "@/components/logo";
@@ -23,6 +23,7 @@ const sidebarItems = [
   { to: "/workout-history", label: "Workout History", icon: History },
   { to: "/movements", label: "Movements", icon: BicepsFlexed },
   { to: "/body-weight", label: "Body Weight", icon: Scale },
+  { to: "/account", label: "Account", icon: UserRound },
 ] as const;
 
 // The phone's dock has five: the two libraries are one item, and the workout is the raised button in the middle.

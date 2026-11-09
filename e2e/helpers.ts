@@ -1,6 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 
-type Section = "Home" | "Current Workout" | "Workout Library" | "Workout History" | "Movements" | "Body Weight";
+type Section =
+  | "Home"
+  | "Current Workout"
+  | "Workout Library"
+  | "Workout History"
+  | "Movements"
+  | "Body Weight"
+  | "Account";
 
 /**
  * Opens a page from the sidebar, the way a user would. On a phone there is a dock with five items instead, and the two
@@ -14,7 +21,15 @@ export async function goTo(page: Page, section: Section) {
     await minimize.click();
     await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
   }
-  if (phone && (section === "Movements" || section === "Workout Library")) {
+  if (phone && section === "Account") {
+    // No room in the dock: Account is in the round menu at the top of Home, next to Log out.
+    if (!(await page.getByRole("heading", { level: 1, name: "Home" }).isVisible())) {
+      await page.getByRole("link", { name: "Home", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
+    }
+    await page.getByRole("button", { name: "Account" }).click();
+    await page.getByRole("link", { name: "Account settings" }).click();
+  } else if (phone && (section === "Movements" || section === "Workout Library")) {
     const tab = page
       .getByRole("navigation", { name: "Library" })
       .getByRole("link", { name: section === "Movements" ? "Movements" : "Workouts", exact: true });
