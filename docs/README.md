@@ -6,4 +6,4 @@ The README's stretch goals, answered in writing. Each one says what was found, w
 | -------------------------- | -------------------------------------------------------------- |
 | Data model and performance | [data-model-and-performance.md](data-model-and-performance.md) |
 | Security                   | [security.md](security.md)                                     |
-| UI polish                  | Coming in a later batch                                        |
+| UI polish                  | [ui.md](ui.md)                                                 |
