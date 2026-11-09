@@ -1,6 +1,6 @@
 import { test, expect, gotoApp, newTestUser, signUp } from "./fixtures";
 import { getDb, seedCompletedWorkouts } from "./db";
-import { completeWorkout, goTo, selectMovement, setRows } from "./helpers";
+import { completeWorkout, goTo, selectMovement, setRows, startWorkout, pressStart } from "./helpers";
 
 const sample = [
   { movement: "Bench Press", weight: 100, reps: 5 },
@@ -14,17 +14,34 @@ const repeat = (page: import("@playwright/test").Page) =>
   rows(page).first().getByRole("button", { name: "Repeat this workout" });
 const progress = (page: import("@playwright/test").Page, text: string) =>
   expect(page.getByText(text, { exact: true })).toBeVisible();
+/** Opens the Start screen for a past workout and presses Start, the way a user repeats it. */
+async function repeatAndStart(page: import("@playwright/test").Page) {
+  await repeat(page).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Repeat a past workout" })).toBeVisible();
+  await pressStart(page);
+  await expect(page).toHaveURL(/\/current-workout/);
+}
 const logButton = (page: import("@playwright/test").Page, movement: string, reps: number, weight: number) =>
   page.getByRole("button", { name: `Log planned ${movement} set: ${reps} × ${weight} lbs` });
 
 test.describe("Repeat a workout", () => {
-  test("should start a workout with the old sets as a checklist, not as logged sets", async ({ page }) => {
+  test("should start a workout with the old sets as a checklist, not as logged sets", async ({ page, user }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
     await repeat(page).click();
 
+    // The old workout is shown as a plan first. Nothing has started: no workout, no clock.
+    await expect(page).toHaveURL(/\/start-workout/);
+    await expect(page.getByRole("heading", { level: 1, name: "Repeat a past workout" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Movements in this workout" }).locator("[data-movement]")).toHaveCount(
+      2,
+    );
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(0);
+    expect(await getDb().workout.count({ where: { completedAt: null, user: { email: user.email } } })).toBe(0);
+    await pressStart(page);
+
     await expect(page).toHaveURL(/\/current-workout/);
-    await expect(page.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
     await expect(page.getByText(/^Planned from /)).toBeVisible();
     await progress(page, "0 of 3 logged");
     await expect(page.getByRole("list", { name: "Planned Bench Press sets" }).getByRole("listitem")).toHaveCount(2);
@@ -37,7 +54,7 @@ test.describe("Repeat a workout", () => {
   test("should log a planned set with the old weight and reps, and keep the ticks after a reload", async ({ page }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await repeat(page).click();
+    await repeatAndStart(page);
 
     await logButton(page, "Bench Press", 5, 100).click();
     await expect(setRows(page)).toHaveCount(1);
@@ -58,11 +75,11 @@ test.describe("Repeat a workout", () => {
   test("should let the weight and reps change before a planned set is logged", async ({ page }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await repeat(page).click();
+    await repeatAndStart(page);
 
     await page.getByRole("button", { name: "Adjust planned Back Squat set: 5 × 150 lbs" }).click();
     // The movement, weight and reps are in the form, and nothing is logged yet.
-    await expect(page.getByRole("combobox", { name: "Movement" })).toContainText("Back Squat");
+    await expect(page.getByRole("group", { name: "Selected movement" })).toContainText("Back Squat");
     await expect(page.getByLabel("Weight", { exact: true })).toHaveValue("150");
     await expect(page.getByLabel("Reps", { exact: true })).toHaveValue("5");
     await expect(setRows(page)).toHaveCount(0);
@@ -76,10 +93,10 @@ test.describe("Repeat a workout", () => {
   test("should leave a skipped planned set out of history, charts and records", async ({ page }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await repeat(page).click();
+    await repeatAndStart(page);
     await logButton(page, "Bench Press", 5, 100).click();
     await expect(setRows(page)).toHaveCount(1);
-    await page.getByRole("button", { name: "Complete Workout" }).click();
+    await page.getByRole("button", { name: "Finish Workout" }).click();
     await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
 
     await goTo(page, "Workout History");
@@ -93,8 +110,8 @@ test.describe("Repeat a workout", () => {
   test("should not start a second workout while one is active", async ({ page }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await repeat(page).click();
-    await expect(page.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+    await repeatAndStart(page);
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
 
     // With a workout open the button is off, and says why.
     await goTo(page, "Workout History");
@@ -106,18 +123,24 @@ test.describe("Repeat a workout", () => {
   test("should refuse on the server when a workout was started in another tab", async ({ page, user }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await expect(repeat(page)).toBeEnabled();
+    await repeat(page).click();
+    await expect(page.getByRole("button", { name: "Start workout" })).toBeEnabled();
 
     // This page still thinks there is no active workout.
     const otherTab = await page.context().newPage();
-    await gotoApp(otherTab, "/current-workout");
-    await otherTab.getByRole("button", { name: "Start Workout" }).click();
-    await expect(otherTab.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+    await gotoApp(otherTab, "/home");
+    await startWorkout(otherTab);
     await page.bringToFront();
-    await expect(repeat(page)).toBeEnabled();
-    await repeat(page).click();
+    await expect(page.getByRole("button", { name: "Start workout" })).toBeEnabled();
+    // 3, 2, 1, GO, and then the server says no.
+    await pressStart(page, { wait: false });
 
-    await expect(page.locator(".Toastify__toast")).toContainText("Finish your current workout before starting another");
+    await expect(page.locator(".Toastify__toast")).toContainText(
+      "Finish your current workout before starting another",
+      {
+        timeout: 15_000,
+      },
+    );
     // Still one workout open, and it is the one from the other tab, with no checklist.
     expect(await getDb().workout.count({ where: { completedAt: null, user: { email: user.email } } })).toBe(1);
     expect(
@@ -128,7 +151,7 @@ test.describe("Repeat a workout", () => {
   test("should keep working when the workout it came from is deleted", async ({ page }) => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
-    await repeat(page).click();
+    await repeatAndStart(page);
     await progress(page, "0 of 3 logged");
 
     await goTo(page, "Workout History");
@@ -137,7 +160,7 @@ test.describe("Repeat a workout", () => {
     await expect(rows(page)).toHaveCount(0);
 
     await goTo(page, "Current Workout");
-    await expect(page.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
     await expect(page.getByText(/^Planned from /)).toHaveCount(0);
     // The workout still takes sets.
     await selectMovement(page, "Bench Press");
@@ -159,15 +182,20 @@ test.describe("Repeat a workout", () => {
     await completeWorkout(page, sample);
     await goTo(page, "Workout History");
     const own = await getDb().workout.findFirstOrThrow({ where: { user: { email: user.email } } });
+    await repeat(page).click();
     await page.route("**/_serverFn/**", async (route) => {
       const body = route.request().postData();
       if (route.request().method() === "POST" && body?.includes(own.id)) {
         await route.continue({ postData: body.replaceAll(own.id, foreignId) });
       } else await route.continue();
     });
-    await repeat(page).click();
+    await pressStart(page, { wait: false });
 
-    await expect(page.locator(".Toastify__toast")).toContainText("Workout not found");
+    await expect(page.locator(".Toastify__toast")).toContainText("Workout not found", { timeout: 15_000 });
     expect(await getDb().workout.count({ where: { sourceWorkoutId: foreignId } })).toBe(0);
+    await page.unroute("**/_serverFn/**");
+    // And the Start screen will not show it.
+    await page.goto(`/start-workout?from=${foreignId}`);
+    await expect(page.getByText("That workout doesn't exist.")).toBeVisible();
   });
 });

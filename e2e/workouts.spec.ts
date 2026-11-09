@@ -15,15 +15,38 @@ function fullDate(page: import("@playwright/test").Page, iso: string) {
 
 test.describe("Workouts", () => {
   test.describe("create", () => {
-    test("should start a new workout from the current workout page", async ({ page }) => {
+    test("should not start a workout until Start is pressed", async ({ page, user }) => {
+      await goTo(page, "Current Workout");
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
-      await expect(page.getByRole("button", { name: "Complete Workout" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(0);
 
-      await page.getByRole("button", { name: "Start Workout" }).click();
+      // Choosing an empty workout opens the screen that shows it. Nothing exists yet: no workout, no clock.
+      await page.getByRole("link", { name: "Empty workout" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "Empty workout" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Start workout" })).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(0);
+      expect(await getDb().workout.count({ where: { user: { email: user.email } } })).toBe(0);
+      // Leaving without starting leaves nothing behind.
+      await page.getByRole("link", { name: "Not now" }).click();
+      await expect(page.getByText(noActiveWorkout)).toBeVisible();
+      expect(await getDb().workout.count({ where: { user: { email: user.email } } })).toBe(0);
 
-      await expect(page.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+      await page.getByRole("link", { name: "Empty workout" }).click();
+      await page.getByRole("button", { name: "Start workout" }).click();
+
+      // 3, 2, 1, GO. The workout does not exist during the countdown: the clock starts at GO.
+      const countdown = page.getByTestId("countdown");
+      await expect(countdown).toHaveAttribute("data-step", "3");
+      expect(await getDb().workout.count({ where: { user: { email: user.email } } })).toBe(0);
+      await expect(countdown).toHaveAttribute("data-step", "2");
+      await expect(countdown).toHaveAttribute("data-step", "1");
+      await expect(countdown).toHaveAttribute("data-step", "GO!");
+      await expect(page).toHaveURL(/\/current-workout/, { timeout: 15_000 });
+      await expect(countdown).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
       await expect(page.getByText("No sets yet. Add exercises to your workout!")).toBeVisible();
       await expect(page.getByText(noActiveWorkout)).toHaveCount(0);
+      expect(await getDb().workout.count({ where: { user: { email: user.email }, completedAt: null } })).toBe(1);
     });
 
     test("should show the workout date after starting", async ({ page, user }) => {
@@ -52,18 +75,20 @@ test.describe("Workouts", () => {
 
       // After a reload the same workout comes back from the server, with its set.
       await page.reload();
-      await expect(page.getByRole("button", { name: "Complete Workout" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
       await expect(setRows(page)).toHaveCount(1);
       await expect(setRows(page)).toContainText("Bench Press");
     });
 
     test("should show 'No active workout' when none exists", async ({ page }) => {
+      await goTo(page, "Current Workout");
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
-      await expect(page.getByRole("button", { name: "Start Workout" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Choose a workout" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Empty workout" })).toBeVisible();
 
       // Also true again after a workout is completed.
       await startWorkout(page);
-      await page.getByRole("button", { name: "Complete Workout" }).click();
+      await page.getByRole("button", { name: "Finish Workout" }).click();
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
     });
 
@@ -86,10 +111,10 @@ test.describe("Workouts", () => {
     test("should mark the current workout as completed", async ({ page }) => {
       await startWorkout(page);
 
-      await page.getByRole("button", { name: "Complete Workout" }).click();
+      await page.getByRole("button", { name: "Finish Workout" }).click();
 
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
-      await expect(page.getByRole("button", { name: "Complete Workout" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(0);
       // The server agrees: a reload does not bring the workout back.
       await page.reload();
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
@@ -112,15 +137,15 @@ test.describe("Workouts", () => {
       await startWorkout(page);
       const otherTab = await page.context().newPage();
       await gotoApp(otherTab, "/current-workout");
-      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
+      await otherTab.getByRole("button", { name: "Finish Workout" }).click();
       await expect(otherTab.getByText(noActiveWorkout)).toBeVisible();
 
-      await page.getByRole("button", { name: "Complete Workout" }).click();
+      await page.getByRole("button", { name: "Finish Workout" }).click();
 
       await expect(page.locator(".Toastify__toast")).toContainText("No active workout to complete");
       // The page was out of date. It shows the state the server has, which is no workout.
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
-      await expect(page.getByRole("button", { name: "Complete Workout" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toHaveCount(0);
     });
   });
 

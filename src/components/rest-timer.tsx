@@ -37,11 +37,17 @@ export function useRestTimer(workoutId: string | null) {
     storage.set(restKey, next && JSON.stringify(next));
   }, []);
 
-  const start = useCallback(() => {
-    if (!workoutId || seconds <= 0) return;
-    const now = Date.now();
-    save({ workoutId, startedAt: now, endsAt: now + seconds * 1000 });
-  }, [workoutId, seconds, save]);
+  // `restSeconds` is the rest a preset asks for after this movement. It wins over the length the user set on this device,
+  // and 0 means no timer for it.
+  const start = useCallback(
+    (restSeconds?: number) => {
+      const length = restSeconds ?? seconds;
+      if (!workoutId || length <= 0) return;
+      const now = Date.now();
+      save({ workoutId, startedAt: now, endsAt: now + length * 1000 });
+    },
+    [workoutId, seconds, save],
+  );
 
   const adjust = useCallback(
     (deltaSeconds: number) => {
@@ -89,7 +95,14 @@ const ring = 2 * Math.PI * 19;
  * The countdown, floating above the dock on a phone and in the corner on a desktop, where a thumb or a glance
  * finds it between sets. It buzzes the phone when the rest is over, then puts itself away.
  */
-export function RestTimerPill({ timer }: { timer: RestTimerState }) {
+export function RestTimerPill({
+  timer,
+  onEnd,
+}: {
+  timer: RestTimerState;
+  /** Called once when the countdown runs out while the page is open. Not when it is skipped. */
+  onEnd?: () => void;
+}) {
   const { rest, adjust, stop } = timer;
   const now = useNow(250, rest !== null);
   const remaining = rest && now !== null ? Math.max(0, (rest.endsAt - now) / 1000) : null;
@@ -104,7 +117,9 @@ export function RestTimerPill({ timer }: { timer: RestTimerState }) {
     else if (wasRunning.current) {
       wasRunning.current = false;
       buzz([180, 90, 180]);
+      onEnd?.();
     }
+    // `onEnd` is read when the rest runs out, from the render that saw it.
   }, [remaining]);
 
   // A finished rest stays for a few seconds, then goes.

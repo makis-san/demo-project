@@ -6,6 +6,7 @@ import { repsSchema, weightSchema } from "@/lib/validation";
 import { withNumberWeight } from "@/lib/sets.server";
 import { visibleMovements } from "@/lib/movements.server";
 import { z } from "zod";
+import { parseTimeline, workoutTimelineSchema, type WorkoutTimeline } from "@/lib/workout-timeline";
 
 // createdAt alone can tie for sets added in the same millisecond, so id breaks the tie.
 const setOrder = [{ createdAt: "asc" as const }, { id: "asc" as const }];
@@ -24,6 +25,20 @@ function findActiveWorkout(prisma: DbClient, userId: string) {
         include: { movement: true },
         orderBy: setOrder,
       },
+      // The preset this workout was started from: its series are the checklist of planned sets.
+      preset: {
+        select: {
+          name: true,
+          exercises: {
+            orderBy: { position: "asc" },
+            select: {
+              restSeconds: true,
+              movement: true,
+              sets: { orderBy: { position: "asc" }, select: { id: true, reps: true, weight: true } },
+            },
+          },
+        },
+      },
       // The workout this one was repeated from. Its sets are the checklist of planned sets.
       sourceWorkout: {
         select: {
@@ -38,34 +53,97 @@ function findActiveWorkout(prisma: DbClient, userId: string) {
 
 type ActiveWorkout = NonNullable<Awaited<ReturnType<typeof findActiveWorkout>>>;
 
-function toClientWorkout({ sourceWorkout, ...workout }: ActiveWorkout) {
-  return {
-    ...workout,
-    sets: workout.sets.map(withNumberWeight),
-    // Null for a workout that was not repeated from another, or whose source was deleted since.
-    plan: sourceWorkout && {
-      workoutId: sourceWorkout.id,
+/**
+ * One planned set of the checklist, whichever way the workout was planned. A preset's weight is optional and it carries
+ * the rest to take after the set. A repeated workout's sets always have a weight and use the rest the user has set.
+ */
+export type PlannedSetOut = {
+  id: string;
+  reps: number;
+  weight: number | null;
+  restSeconds: number | null;
+  movement: ActiveWorkout["sets"][number]["movement"];
+};
+
+function toClientWorkout({ sourceWorkout, preset, ...workout }: ActiveWorkout) {
+  let plan: { title: string | null; completedAt: Date | null; sets: PlannedSetOut[] } | null = null;
+  if (preset) {
+    plan = {
+      title: preset.name,
+      completedAt: null,
+      sets: preset.exercises.flatMap((exercise) =>
+        exercise.sets.map((set) => ({
+          id: set.id,
+          reps: set.reps,
+          weight: set.weight?.toNumber() ?? null,
+          restSeconds: exercise.restSeconds,
+          movement: exercise.movement,
+        })),
+      ),
+    };
+  } else if (sourceWorkout) {
+    plan = {
+      title: null,
       completedAt: sourceWorkout.completedAt,
-      sets: sourceWorkout.sets.map(withNumberWeight),
-    },
-  };
+      sets: sourceWorkout.sets.map((set) => ({ ...withNumberWeight(set), restSeconds: null })),
+    };
+  }
+  return { ...workout, timeline: parseTimeline(workout.timeline), sets: workout.sets.map(withNumberWeight), plan };
 }
 
-export const createWorkoutServerFn = createServerFn({ method: "POST" })
+/**
+ * Starts a workout, the moment the user presses Start on the screen that shows what it will be. Until then nothing exists:
+ * choosing a preset, the workout of the day or a past workout only opens that screen. The new workout remembers where
+ * its plan came from, so the planned sets are there for the whole workout and after a reload.
+ *
+ * Only one workout can be active (a unique index), so with one open this refuses and says so.
+ */
+export const startWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
-  .handler(async ({ context }) => {
-    const prisma = await getServerSidePrismaClient();
-    try {
-      await prisma.workout.create({ data: { userId: context.user.id } });
-    } catch (error) {
-      // The unique index on active workouts rejected a second one, for example
-      // from a double click or a second tab. The existing one is what the user wants.
-      if (!isUniqueViolation(error)) throw error;
-    }
-    const workout = await findActiveWorkout(prisma, context.user.id);
-    if (!workout) throw new Error("Active workout not found after creating it");
-    return { success: true, workout: toClientWorkout(workout) };
-  });
+  .inputValidator(z.object({ presetId: z.string().nullable(), fromWorkoutId: z.string().nullable() }))
+  .handler(
+    async ({
+      context,
+      data,
+    }: {
+      context: { user: { id: string } };
+      data: { presetId: string | null; fromWorkoutId: string | null };
+    }) => {
+      const prisma = await getServerSidePrismaClient();
+      const userId = context.user.id;
+      if (data.presetId && data.fromWorkoutId)
+        return { success: false as const, error: "Pick one thing to start from" };
+
+      if (data.presetId) {
+        const preset = await prisma.workoutPreset.findFirst({
+          where: { id: data.presetId, userId },
+          select: { id: true },
+        });
+        if (!preset) return { success: false as const, error: "Workout not found" };
+      }
+      if (data.fromWorkoutId) {
+        const source = await prisma.workout.findFirst({
+          where: { id: data.fromWorkoutId, userId, completedAt: { not: null } },
+          select: { id: true, _count: { select: { sets: true } } },
+        });
+        if (!source) return { success: false as const, error: "Workout not found" };
+        if (source._count.sets === 0) return { success: false as const, error: "That workout has no sets to repeat" };
+      }
+
+      try {
+        await prisma.workout.create({
+          data: { userId, presetId: data.presetId, sourceWorkoutId: data.fromWorkoutId },
+        });
+      } catch (error) {
+        // The unique index on active workouts says one is already open, for example started in another tab.
+        if (isUniqueViolation(error)) {
+          return { success: false as const, error: "Finish your current workout before starting another" };
+        }
+        throw error;
+      }
+      return { success: true as const };
+    },
+  );
 
 export const getCurrentWorkoutServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
@@ -75,20 +153,57 @@ export const getCurrentWorkoutServerFn = createServerFn()
     return workout && toClientWorkout(workout);
   });
 
+/**
+ * Saves the timeline of the user's open workout, sent by the browser after it saved it locally. Each copy carries the
+ * time it was changed, and an older copy than the stored one is ignored: two tabs, or a retry that arrives late, cannot
+ * put the ring back in time. A completed workout's timeline is not changed any more.
+ */
+export const saveWorkoutTimelineServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware, authMiddleware])
+  .inputValidator(z.object({ workoutId: z.string(), timeline: workoutTimelineSchema }))
+  .handler(
+    async ({
+      context,
+      data,
+    }: {
+      context: { user: { id: string } };
+      data: { workoutId: string; timeline: WorkoutTimeline };
+    }) => {
+      const prisma = await getServerSidePrismaClient();
+      const workout = await prisma.workout.findFirst({
+        where: { id: data.workoutId, userId: context.user.id, completedAt: null },
+        select: { timeline: true },
+      });
+      if (!workout) return { success: false as const, error: "No active workout" };
+      const stored = parseTimeline(workout.timeline);
+      if (stored && stored.updatedAt > data.timeline.updatedAt) return { success: true as const, timeline: stored };
+      // completedAt: null again in the write, so a workout completed in between is left alone.
+      await prisma.workout.updateMany({
+        where: { id: data.workoutId, userId: context.user.id, completedAt: null },
+        data: { timeline: data.timeline },
+      });
+      return { success: true as const, timeline: data.timeline };
+    },
+  );
+
+/** Completes the open workout. The browser sends its final timeline with it, so the last section and pause are closed. */
 export const completeWorkoutServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
-  .handler(async ({ context }) => {
-    const prisma = await getServerSidePrismaClient();
-    const workout = await findActiveWorkout(prisma, context.user.id);
-    if (!workout) {
-      return { success: false as const, error: "No active workout to complete" };
-    }
-    await prisma.workout.update({
-      where: { id: workout.id },
-      data: { completedAt: new Date() },
-    });
-    return { success: true as const };
-  });
+  .inputValidator(z.object({ timeline: workoutTimelineSchema.nullable() }))
+  .handler(
+    async ({ context, data }: { context: { user: { id: string } }; data: { timeline: WorkoutTimeline | null } }) => {
+      const prisma = await getServerSidePrismaClient();
+      const workout = await findActiveWorkout(prisma, context.user.id);
+      if (!workout) {
+        return { success: false as const, error: "No active workout to complete" };
+      }
+      await prisma.workout.update({
+        where: { id: workout.id },
+        data: { completedAt: new Date(), ...(data.timeline && { timeline: data.timeline }) },
+      });
+      return { success: true as const };
+    },
+  );
 
 export const addSetServerFn = createServerFn({ method: "POST" })
   .middleware([errorMiddleware, authMiddleware])
@@ -169,34 +284,6 @@ export const updateSetServerFn = createServerFn({ method: "POST" })
       return { success: true as const, set: withNumberWeight(set) };
     },
   );
-
-/**
- * Starts a new workout from a completed one. The old workout's sets are not copied: they show up as planned sets
- * (see `plan` in the active workout) that the user logs one by one, so a skipped one leaves no trace in history, charts
- * or personal records. Only one workout can be active, so with one open this refuses and says so.
- */
-export const repeatWorkoutServerFn = createServerFn({ method: "POST" })
-  .middleware([errorMiddleware, authMiddleware])
-  .inputValidator(z.object({ workoutId: z.string() }))
-  .handler(async ({ context, data }: { context: { user: { id: string } }; data: { workoutId: string } }) => {
-    const prisma = await getServerSidePrismaClient();
-    const source = await prisma.workout.findFirst({
-      where: { id: data.workoutId, userId: context.user.id, completedAt: { not: null } },
-      select: { id: true, _count: { select: { sets: true } } },
-    });
-    if (!source) return { success: false as const, error: "Workout not found" };
-    if (source._count.sets === 0) return { success: false as const, error: "That workout has no sets to repeat" };
-    try {
-      await prisma.workout.create({ data: { userId: context.user.id, sourceWorkoutId: source.id } });
-    } catch (error) {
-      // The unique index on active workouts says one is already open.
-      if (isUniqueViolation(error)) {
-        return { success: false as const, error: "Finish your current workout before starting another" };
-      }
-      throw error;
-    }
-    return { success: true as const };
-  });
 
 /** How many completed workouts one page of history holds. */
 export const historyPageSize = 20;

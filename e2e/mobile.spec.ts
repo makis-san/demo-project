@@ -1,7 +1,7 @@
 import { test as signedOut, expect as expectSignedOut, type Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { seedCompletedWorkouts } from "./db";
-import { addMovement, addSet, goTo, logBodyWeight, setRows, startWorkout } from "./helpers";
+import { addMovement, addSet, goTo, logBodyWeight, selectMovement, setRows, startWorkout } from "./helpers";
 import { gotoApp } from "./fixtures";
 
 // A phone: the sidebar becomes a bar along the bottom. The rest of the suite runs at a desktop size.
@@ -34,8 +34,19 @@ test.describe("Phone, signed in", () => {
   test("should log a set with every control inside the window", async ({ page }) => {
     await startWorkout(page);
 
+    // The button for an extra movement is on the screen and big enough to tap.
+    const addMovementButton = await page.getByRole("button", { name: "Add movement", exact: true }).boundingBox();
+    expect(addMovementButton!.x).toBeGreaterThanOrEqual(0);
+    expect(addMovementButton!.x + addMovementButton!.width).toBeLessThanOrEqual(phone.width);
+    expect(addMovementButton!.height).toBeGreaterThanOrEqual(36);
+    await selectMovement(page, "Bench Press");
+
     // Each control has the whole width, and the Add button is on the screen and not too small to tap.
-    for (const control of [page.getByLabel("Movement"), page.getByLabel("Weight"), page.getByLabel("Reps")]) {
+    for (const control of [
+      page.getByRole("group", { name: "Selected movement" }),
+      page.getByLabel("Weight", { exact: true }),
+      page.getByLabel("Reps", { exact: true }),
+    ]) {
       const box = await control.boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(phone.width);
@@ -52,9 +63,10 @@ test.describe("Phone, signed in", () => {
 
   test("should bring up a number keypad for weight and reps", async ({ page }) => {
     await startWorkout(page);
+    await selectMovement(page, "Bench Press");
 
-    await expect(page.getByLabel("Weight")).toHaveAttribute("inputmode", "decimal");
-    await expect(page.getByLabel("Reps")).toHaveAttribute("inputmode", "numeric");
+    await expect(page.getByLabel("Weight", { exact: true })).toHaveAttribute("inputmode", "decimal");
+    await expect(page.getByLabel("Reps", { exact: true })).toHaveAttribute("inputmode", "numeric");
     await goTo(page, "Body Weight");
     await expect(page.getByLabel("Weight in lbs")).toHaveAttribute("inputmode", "decimal");
   });

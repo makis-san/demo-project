@@ -10,10 +10,7 @@ test.describe("Movements", () => {
       await goTo(page, "Movements");
 
       // About a hundred, and the common lifts are in them.
-      const total = await page
-        .getByRole("list", { name: /^Movements starting with/ })
-        .getByRole("listitem")
-        .count();
+      const total = await page.getByRole("list", { name: "Movements" }).getByRole("listitem").count();
       expect(total).toBeGreaterThanOrEqual(90);
       await expect(movementRow(page, "Bench Press")).toBeVisible();
       await expect(movementRow(page, "Back Squat")).toBeVisible();
@@ -24,23 +21,19 @@ test.describe("Movements", () => {
 
     test("should find movements by name, muscle and equipment", async ({ page }) => {
       await goTo(page, "Movements");
-      const names = () =>
-        page
-          .getByRole("list", { name: /^Movements starting with/ })
-          .getByRole("link")
-          .allTextContents();
+      const names = () => page.getByRole("list", { name: "Movements" }).getByRole("link").allTextContents();
 
       await page.getByLabel("Search movements").fill("squat");
       expect(await names()).toEqual(expect.arrayContaining(["Back Squat", "Front Squat", "Goblet Squat"]));
       expect((await names()).every((name) => /squat/i.test(name))).toBe(true);
       await page.getByLabel("Search movements").clear();
 
-      // Calves are trained by the calf raises, and by some other movements as a secondary muscle.
-      await page.getByLabel("Filter by muscle").selectOption({ label: "Calves" });
-      expect(await names()).toEqual(expect.arrayContaining(["Standing Calf Raise", "Seated Calf Raise", "Back Squat"]));
+      // The Legs tab: movements whose primary muscles are quads, hamstrings, glutes or calves.
+      await page.getByRole("tab", { name: /^Legs/ }).click();
+      expect(await names()).toEqual(expect.arrayContaining(["Standing Calf Raise", "Back Squat", "Romanian Deadlift"]));
       expect(await names()).not.toContain("Bench Press");
 
-      await page.getByLabel("Filter by muscle").selectOption({ label: "Any muscle" });
+      await page.getByRole("tab", { name: /^All/ }).click();
       await page.getByLabel("Filter by equipment").selectOption({ label: "Kettlebell" });
       await expect(page.getByText("1 of ")).toBeVisible();
       expect(await names()).toEqual(["Kettlebell Swing"]);
@@ -148,7 +141,7 @@ test.describe("Movements", () => {
       for (const name of ["Zottman Curl Hold", "Atlas Stone Lift", "Meadows Row Slow"]) await addMovement(page, name);
 
       await page.getByRole("button", { name: /^Mine/ }).click();
-      const names = page.getByRole("list", { name: /^Movements starting with/ }).getByRole("link");
+      const names = page.getByRole("list", { name: "Movements" }).getByRole("link");
       await expect(names).toHaveText(["Atlas Stone Lift", "Meadows Row Slow", "Zottman Curl Hold"]);
     });
   });

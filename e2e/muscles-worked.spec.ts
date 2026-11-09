@@ -53,7 +53,7 @@ test.describe("Muscles worked", () => {
     await expect(page.getByText("No completed workouts in the last 7 days.")).toBeVisible();
 
     await goTo(page, "Current Workout");
-    await page.getByRole("button", { name: "Complete Workout" }).click();
+    await page.getByRole("button", { name: "Finish Workout" }).click();
     await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
     await goTo(page, "Workout History");
     await expect(

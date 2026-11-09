@@ -16,26 +16,25 @@ test.describe("Sets", () => {
       await expect(page.locator(".Toastify__toast")).toHaveCount(0);
     });
 
-    test("should require movement, weight, and reps to add a set", async ({ page }) => {
-      const add = page.getByRole("button", { name: "Add", exact: true });
-      const weight = page.getByLabel("Weight");
-      const reps = page.getByLabel("Reps");
+    test("should show the set form only for a movement, and require weight and reps to add a set", async ({ page }) => {
+      // No movement picked: no form, no movement picker on the page, only the button to add one.
+      await expect(page.getByLabel("Weight")).toHaveCount(0);
+      await expect(page.getByLabel("Reps")).toHaveCount(0);
+      await expect(page.getByRole("combobox")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Add movement", exact: true })).toBeVisible();
 
-      await expect(add).toBeDisabled();
-
-      await weight.fill("100");
-      await reps.fill("5");
-      await expect(add, "weight and reps without a movement").toBeDisabled();
-
-      await weight.clear();
       await selectMovement(page, "Bench Press");
-      await expect(add, "movement and reps without a weight").toBeDisabled();
+      const add = page.getByRole("button", { name: "Add", exact: true });
+      const weight = page.getByLabel("Weight", { exact: true });
+      const reps = page.getByLabel("Reps", { exact: true });
 
-      await reps.clear();
+      await expect(add, "movement only").toBeDisabled();
       await weight.fill("100");
       await expect(add, "movement and weight without reps").toBeDisabled();
-
+      await weight.clear();
       await reps.fill("5");
+      await expect(add, "movement and reps without a weight").toBeDisabled();
+      await weight.fill("100");
       await expect(add, "all three").toBeEnabled();
 
       // Pressing Enter with a field missing must not add anything either.
@@ -185,12 +184,12 @@ test.describe("Sets", () => {
       await expect(setRows(page).filter({ hasText: "Back Squat" })).toHaveCount(1);
     });
 
-    test("should show an error, then no workout, and keep the typed reps for the next one when the workout was completed in another tab", async ({
+    test("should show an error, then no workout, and save nothing when the workout was completed in another tab", async ({
       page,
     }) => {
       const otherTab = await page.context().newPage();
       await gotoApp(otherTab, "/current-workout");
-      await otherTab.getByRole("button", { name: "Complete Workout" }).click();
+      await otherTab.getByRole("button", { name: "Finish Workout" }).click();
       await expect(otherTab.getByText("No active workout. Ready to start?")).toBeVisible();
 
       await selectMovement(page, "Bench Press");
@@ -202,10 +201,6 @@ test.describe("Sets", () => {
       // The form belongs to a workout, so it goes with it, and nothing was saved.
       await expect(page.getByText("No active workout. Ready to start?")).toBeVisible();
       await expect(setRows(page)).toHaveCount(0);
-
-      // What was typed is not lost: it is still there for the next workout.
-      await page.getByRole("button", { name: "Start Workout" }).click();
-      await expect(page.getByLabel("Reps")).toHaveValue("7");
     });
   });
 });

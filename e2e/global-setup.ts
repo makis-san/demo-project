@@ -20,7 +20,14 @@ export default async function globalSetup(config: FullConfig) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       await signUp(page, newTestUser());
-      for (const path of ["/movements", "/workout-history", "/body-weight", "/current-workout"]) {
+      for (const path of [
+        "/home",
+        "/movements",
+        "/workout-history",
+        "/body-weight",
+        "/current-workout",
+        "/workout-library",
+      ]) {
         await page.goto(path, { waitUntil: "networkidle" });
       }
       break;

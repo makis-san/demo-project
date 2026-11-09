@@ -76,8 +76,10 @@ test.describe("Editing a set", () => {
     // The form would not send this, so change the request the way an edited one would.
     await page.route("**/_serverFn/**", async (route) => {
       const body = route.request().postData();
-      if (route.request().method() === "POST" && body?.includes("85")) {
-        await route.continue({ postData: body.replace(/85/, "-5") });
+      // Only the number 85 on its own: the set's random id can contain "85" too.
+      const weight = /(?<![\w.])85(?![\w.])/;
+      if (route.request().method() === "POST" && body && weight.test(body)) {
+        await route.continue({ postData: body.replace(weight, "-5") });
       } else await route.continue();
     });
     await page.getByRole("button", { name: "Save set" }).click();

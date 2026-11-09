@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Morph } from "@/components/morph";
 import { cn } from "@/lib/utils";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { buttonClasses } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -9,15 +10,18 @@ import { createMovementServerFn } from "@/lib/movements.server";
 import { Card } from "@/components/ui/card";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { movementsQueryKey, movementsQueryOptions } from "./-queries/movements";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { MusclePicker, type MuscleSelection } from "@/components/muscle-picker";
+import { CategoryTabs } from "@/components/category-tabs";
+import { MovementCard } from "@/components/movement-card";
 import {
   equipmentLabels,
   equipmentTypes,
-  muscleGroups,
-  muscleLabels,
+  isInCategory,
+  movementCategories,
   type Equipment,
+  type MovementCategory,
   type MuscleGroup,
 } from "@/lib/muscles";
 
@@ -35,7 +39,9 @@ function MovementsPage() {
   const { data: movements } = useSuspenseQuery(movementsQueryOptions());
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [muscle, setMuscle] = useState<MuscleGroup | "">("");
+  const [category, setCategory] = useState<MovementCategory | null>(null);
+  // The movements ticked on their cards, in the order they were ticked, to build a workout from.
+  const [picked, setPicked] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<Equipment | "">("");
   const [mineOnly, setMineOnly] = useState(false);
 
@@ -68,7 +74,7 @@ function MovementsPage() {
       setMuscles({ primary: [], secondary: [] });
       setSearch("");
       setFilter("all");
-      setMuscle("");
+      setCategory(null);
       setEquipment("");
       setMineOnly(false);
       setJustAdded(input.name.toLowerCase());
@@ -97,25 +103,30 @@ function MovementsPage() {
   const shown = movements.filter(
     (m) =>
       (filter === "all" || (filter === "bodyWeight") === m.isBodyWeight) &&
-      (!muscle || m.primaryMuscles.includes(muscle) || m.secondaryMuscles.includes(muscle)) &&
+      (!category || isInCategory(m.primaryMuscles, category)) &&
       (!equipment || m.equipment === equipment) &&
       (!mineOnly || !m.isBuiltIn) &&
       (!query || m.name.toLowerCase().includes(query)),
   );
-  const filtering = !!(query || muscle || equipment || mineOnly || filter !== "all");
+  const filtering = !!(query || category || equipment || mineOnly || filter !== "all");
 
   // The name typed in the form is taken: say so before the server has to.
   const typed = name.trim().toLowerCase();
   const taken = typed ? movements.find((m) => m.name.toLowerCase() === typed) : undefined;
 
-  // Runs of the same first letter, in the order the server sorted them, like a phone's contact list.
-  const groups: { letter: string; items: typeof shown }[] = [];
-  for (const movement of shown) {
-    const letter = /[a-z]/i.test(movement.name[0]) ? movement.name[0].toUpperCase() : "#";
-    const last = groups[groups.length - 1];
-    if (last?.letter === letter) last.items.push(movement);
-    else groups.push({ letter, items: [movement] });
-  }
+  // How many movements each tab holds, with the other filters applied except the tab itself.
+  const base = movements.filter(
+    (m) =>
+      (filter === "all" || (filter === "bodyWeight") === m.isBodyWeight) &&
+      (!equipment || m.equipment === equipment) &&
+      (!mineOnly || !m.isBuiltIn) &&
+      (!query || m.name.toLowerCase().includes(query)),
+  );
+  const tabCounts: Partial<Record<MovementCategory | "all", number>> = { all: base.length };
+  for (const c of movementCategories) tabCounts[c.id] = base.filter((m) => isInCategory(m.primaryMuscles, c.id)).length;
+
+  const togglePicked = (id: string) =>
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   return (
     <div className="space-y-6">
@@ -141,30 +152,18 @@ function MovementsPage() {
             autoComplete="off"
           />
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Select
-            aria-label="Filter by muscle"
-            value={muscle}
-            onChange={(e) => setMuscle(e.target.value as MuscleGroup | "")}>
-            <option value="">Any muscle</option>
-            {muscleGroups.map((m) => (
-              <option key={m} value={m}>
-                {muscleLabels[m]}
-              </option>
-            ))}
-          </Select>
-          <Select
-            aria-label="Filter by equipment"
-            value={equipment}
-            onChange={(e) => setEquipment(e.target.value as Equipment | "")}>
-            <option value="">Any equipment</option>
-            {equipmentTypes.map((e) => (
-              <option key={e} value={e}>
-                {equipmentLabels[e]}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <CategoryTabs value={category} onChange={setCategory} counts={tabCounts} />
+        <Select
+          aria-label="Filter by equipment"
+          value={equipment}
+          onChange={(e) => setEquipment(e.target.value as Equipment | "")}>
+          <option value="">Any equipment</option>
+          {equipmentTypes.map((e) => (
+            <option key={e} value={e}>
+              {equipmentLabels[e]}
+            </option>
+          ))}
+        </Select>
         <p className="num min-h-5 px-2 text-xs text-faint" aria-live="polite">
           {filtering
             ? shown.length === 0
@@ -217,60 +216,42 @@ function MovementsPage() {
         </div>
         {shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line-strong px-4 py-10 text-center text-sm text-muted">
-            {mineOnly && mineCount === 0 && !query && !muscle && !equipment
+            {mineOnly && mineCount === 0 && !query && !category && !equipment
               ? "You haven't created any movements. The library has plenty to start with."
               : "No movements match."}
           </p>
         ) : (
-          <div className="space-y-4">
-            {groups.map(({ letter, items }) => (
-              <section key={letter} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2">
-                <p aria-hidden="true" className="pt-3 text-center text-lg font-bold text-accent/80 font-stretch-[120%]">
-                  {letter}
-                </p>
-                <ul className="grid gap-1.5 sm:grid-cols-2" aria-label={`Movements starting with ${letter}`}>
-                  {items.map((movement) => (
-                    <li
-                      key={movement.id}
-                      className={cn(
-                        "relative flex min-h-14 min-w-0 items-center gap-3 rounded-2xl bg-well px-4 py-2.5 transition-colors hover:bg-white/[0.07]",
-                        justAdded === movement.name.toLowerCase() && "enter ring-1 ring-primary/60",
-                      )}>
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          to="/movements/$movementId"
-                          params={{ movementId: movement.id }}
-                          className="block truncate text-[15px] font-medium text-chalk after:absolute after:inset-0 after:rounded-2xl">
-                          <Highlight text={movement.name} query={query} />
-                        </Link>
-                        <p className="truncate text-xs text-faint">
-                          {[
-                            movement.equipment && equipmentLabels[movement.equipment],
-                            movement.primaryMuscles.map((m) => muscleLabels[m]).join(", "),
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "No muscles set"}
-                        </p>
-                      </div>
-                      {!movement.isBuiltIn && (
-                        <span className="shrink-0 rounded-full bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted">
-                          Yours
-                        </span>
-                      )}
-                      {movement.isBodyWeight && (
-                        <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-accent">
-                          Body weight
-                        </span>
-                      )}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
-                    </li>
-                  ))}
-                </ul>
-              </section>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5 sm:grid-cols-2" aria-label="Movements">
+            {shown.map((movement) => (
+              <li key={movement.id}>
+                <MovementCard
+                  movement={movement}
+                  href
+                  selected={picked.includes(movement.id)}
+                  onToggle={() => togglePicked(movement.id)}
+                  highlight={justAdded === movement.name.toLowerCase()}
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </Card>
+
+      {picked.length > 0 && (
+        <div
+          role="region"
+          aria-label="Selected movements"
+          className="glass glass-strong sticky bottom-24 z-10 flex items-center gap-3 rounded-[1.5rem] p-3 md:bottom-4">
+          <p className="num min-w-0 flex-1 px-2 text-sm font-semibold text-chalk">{picked.length} selected</p>
+          <Button variant="ghost" size="sm" onClick={() => setPicked([])}>
+            <X className="h-4 w-4" />
+            Clear
+          </Button>
+          <Link to="/workout-library/new" search={{ movements: picked.join(",") }} className={buttonClasses()}>
+            Create workout
+          </Link>
+        </div>
+      )}
 
       <Card id="create-movement" className="enter enter-3 scroll-mt-6 p-3 sm:p-4">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -331,18 +312,5 @@ function MovementsPage() {
         </form>
       </Card>
     </div>
-  );
-}
-
-/** The name with the searched part lit. The text stays one string, so the row still reads as the name. */
-function Highlight({ text, query }: { text: string; query: string }) {
-  const at = query ? text.toLowerCase().indexOf(query) : -1;
-  if (at < 0) return <>{text}</>;
-  return (
-    <>
-      {text.slice(0, at)}
-      <mark className="rounded-[4px] bg-primary/25 px-0.5 text-chalk">{text.slice(at, at + query.length)}</mark>
-      {text.slice(at + query.length)}
-    </>
   );
 }
