@@ -64,6 +64,9 @@ export function clientAddress(): string {
   return getRequestIP() ?? "unknown";
 }
 
+/** The answer when a limit is hit. The same whether or not the email has an account, so it reveals nothing about accounts. */
+export const tooManyAttempts = { success: false as const, error: "Too many attempts. Try again in a few minutes." };
+
 /** The counters are per address and email, so someone elsewhere cannot lock a user out. */
 export function takeSignInAttempt(ip: string, email: string): boolean {
   const emailKey = `sign-in:${ip}:${email}`;

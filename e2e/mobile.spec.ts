@@ -111,8 +111,30 @@ test.describe("Phone, signed in", () => {
     expect(scroll).toBeGreaterThan(client);
   });
 
+  test("should fit the Account page in the window, with the deletion confirmation open", async ({ page }) => {
+    await goTo(page, "Account");
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await expect(page.getByRole("group", { name: "Confirm account deletion" })).toBeVisible();
+    await expectNoSidewaysScroll(page);
+    // The bar at the bottom still holds all eight links.
+    const bar = page.getByRole("navigation", { name: "Main" });
+    for (const name of [
+      "Home",
+      "Current Workout",
+      "Workout Library",
+      "Workout History",
+      "Movements",
+      "Body Weight",
+      "Account",
+    ]) {
+      const box = await bar.getByRole("link", { name, exact: true }).boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(phone.width);
+    }
+  });
+
   test("should reach every page and log out from the bar at the bottom", async ({ page }) => {
-    for (const section of ["Workout History", "Movements", "Body Weight", "Current Workout"] as const) {
+    for (const section of ["Workout History", "Movements", "Body Weight", "Account", "Current Workout"] as const) {
       await goTo(page, section);
     }
 

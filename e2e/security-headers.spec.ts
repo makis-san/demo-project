@@ -93,6 +93,7 @@ const signedInPages = [
   "/workout-history",
   "/movements",
   "/body-weight",
+  "/account",
 ];
 
 async function watchForViolations(page: Page) {

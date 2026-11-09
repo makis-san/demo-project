@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import { redirect } from "@tanstack/react-router";
-import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
-import { createMiddleware, createServerFn } from "@tanstack/react-start";
+import { getCookie, getRequestHeader, setCookie, deleteCookie } from "@tanstack/react-start/server";
+import { createMiddleware, createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { sessionCookieName } from "./auth.consts";
 import { configService } from "./config.server";
 import { getServerSidePrismaClient, isUniqueViolation } from "./db.server";
+import { deviceLabel } from "./device-label";
 import { errorMiddleware } from "./errors.server";
 import { emailSchema, passwordSchema } from "./validation";
 import { z } from "zod";
@@ -15,12 +16,18 @@ import {
   giveBackSignUpAttempt,
   takeSignInAttempt,
   takeSignUpAttempt,
+  tooManyAttempts,
 } from "./rate-limit.server";
 
-// The same answer whether or not the email has an account, so it reveals nothing about accounts.
-const tooManyAttempts = { success: false as const, error: "Too many attempts. Try again in a few minutes." };
+const hourMs = 60 * 60 * 1000;
+const dayMs = 24 * hourMs;
 
-const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+/** How long a session lasts without use. Using the app pushes this forward, see `currentSession`. */
+const sessionLifetimeMs = 7 * dayMs;
+/** How long a session lasts at most, however much it is used. After this the user signs in again. */
+const sessionMaxAgeMs = 30 * dayMs;
+/** The most often a session's row is written to by page loads. */
+const touchIntervalMs = hourMs;
 
 /**
  * Secure keeps the cookie off plain HTTP. It is on unless ENVIRONMENT says
@@ -54,11 +61,62 @@ async function startSession(userId: string) {
   const token = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + sessionLifetimeMs);
 
-  await prisma.session.create({ data: { tokenHash: hashToken(token), userId, expiresAt } });
+  await prisma.session.create({
+    data: { tokenHash: hashToken(token), userId, expiresAt, deviceLabel: deviceLabel(getRequestHeader("user-agent")) },
+  });
   // Expired rows are already refused by the lookup below, this only keeps the table small.
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 
   setCookie(sessionCookieName, token, { ...cookieOptions(), expires: expiresAt });
+}
+
+/**
+ * Signs this browser out: the cookie goes, and the caller deletes the row if there is one. It is exported for
+ * another server file, and an export stays in the browser's bundle even when nothing there uses it, which would
+ * pull the server-only cookie code in with it. `createServerOnlyFn` leaves an empty stub in the browser.
+ */
+export const clearSessionCookie = createServerOnlyFn(() => {
+  deleteCookie(sessionCookieName, cookieOptions());
+});
+
+/**
+ * The session of this request's cookie and its user, or null when there is no valid one.
+ *
+ * Valid means the row exists, has not expired, and was made less than 30 days ago. The 30 days are checked on their
+ * own and not left to `expiresAt`, so a stolen token that keeps being used still stops working: sliding expiry alone
+ * would let it live forever.
+ *
+ * Using the app also slides the expiry: the first request after an hour since the last write sets `lastSeenAt` to now
+ * and `expiresAt` to seven days from now, but never past the 30 days, and sends the cookie again with the new date.
+ * The write is limited to once an hour, otherwise every page load would write to the database. It is an
+ * `updateMany` on the old `lastSeenAt`, so requests that arrive together do not all write, only one wins.
+ */
+async function currentSession() {
+  const token = getCookie(sessionCookieName);
+  if (!token) return null;
+
+  const prisma = await getServerSidePrismaClient();
+  const now = Date.now();
+  const session = await prisma.session.findFirst({
+    where: {
+      tokenHash: hashToken(token),
+      expiresAt: { gt: new Date(now) },
+      createdAt: { gt: new Date(now - sessionMaxAgeMs) },
+    },
+    select: { id: true, createdAt: true, lastSeenAt: true, user: { select: { id: true, email: true, name: true } } },
+  });
+  if (!session) return null;
+
+  if (now - session.lastSeenAt.getTime() >= touchIntervalMs) {
+    const expiresAt = new Date(Math.min(now + sessionLifetimeMs, session.createdAt.getTime() + sessionMaxAgeMs));
+    const { count } = await prisma.session.updateMany({
+      where: { id: session.id, lastSeenAt: session.lastSeenAt },
+      data: { lastSeenAt: new Date(now), expiresAt },
+    });
+    if (count === 1) setCookie(sessionCookieName, token, { ...cookieOptions(), expires: expiresAt });
+  }
+
+  return { id: session.id, user: session.user };
 }
 
 /**
@@ -70,17 +128,7 @@ async function startSession(userId: string) {
 export const getUserServerFn = createServerFn()
   .middleware([errorMiddleware])
   .handler(async () => {
-    const token = getCookie(sessionCookieName);
-    if (!token) {
-      return null;
-    }
-
-    const prisma = await getServerSidePrismaClient();
-    const session = await prisma.session.findFirst({
-      where: { tokenHash: hashToken(token), expiresAt: { gt: new Date() } },
-      select: { user: { select: { id: true, email: true, name: true } } },
-    });
-
+    const session = await currentSession();
     return session?.user ?? null;
   });
 
@@ -173,21 +221,22 @@ export const logoutServerFn = createServerFn({ method: "POST" })
       const prisma = await getServerSidePrismaClient();
       await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
     }
-    deleteCookie(sessionCookieName, cookieOptions());
+    clearSessionCookie();
     return { success: true };
   });
 
 /**
- * Authentication middleware that ensures user is logged in
+ * Authentication middleware that ensures user is logged in. It puts the user and the id of the session that made
+ * the request on the context. The id is for "this device" on the Account page and is not sent to the browser.
  * @throws Redirects to sign-in page if not authenticated
  */
 export const authMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
-  const user = await getUserServerFn();
-  if (!user) {
+  const session = await currentSession();
+  if (!session) {
     throw redirect({ to: "/sign-in" });
   }
 
   return next({
-    context: { user },
+    context: { user: session.user, sessionId: session.id },
   });
 });
