@@ -41,7 +41,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs on one worker and takes about 19 minutes, so 20 left no room for a slower runner.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
