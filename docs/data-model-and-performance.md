@@ -33,7 +33,7 @@ The original code had these problems. Each is fixed on `main`, and each has a ti
 | The same email could make two accounts (`Foo@x.com` and `foo@x.com`)                                      | Emails are stored trimmed and lowercase, and a `CHECK` makes the database refuse anything else                                                                                                | [`migration`](../prisma/migrations/20261107210000_emails_are_lowercase/migration.sql)          |
 | History loaded every workout                                                                              | Cursor paging on `(completedAt, id)`, 20 a page. The cursor is the last row of the previous page, so a workout added meanwhile does not skip or repeat one                                    | [`workouts.server.ts`](../src/lib/workouts.server.ts)                                          |
 
-Three problems were still there when I looked again, and were fixed in this batch.
+Three problems were still there when I looked again. Two are fixed, and the third was measured and left as it is.
 
 ### A user could not be deleted
 
