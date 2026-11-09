@@ -461,6 +461,64 @@
   }
 }
 
+/* The steps of a new workout, and the detail view of the movement sheet: the next one slides in from the side it
+ * comes from. A card changed by a bulk edit glows once, so the eye finds what changed. */
+@layer utilities {
+  .step-next {
+    animation: step-next 380ms var(--ease-enter) both;
+  }
+  .step-prev {
+    animation: step-prev 380ms var(--ease-enter) both;
+  }
+  .flash {
+    animation: flash 900ms var(--ease-out-soft) both;
+  }
+}
+@keyframes step-next {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes step-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+@keyframes flash {
+  0% {
+    box-shadow:
+      inset 0 0 0 1px oklch(74% 0.15 15 / 0),
+      0 0 0 0 oklch(58% 0.215 27 / 0);
+  }
+  25% {
+    box-shadow:
+      inset 0 0 0 1px oklch(74% 0.15 15 / 0.9),
+      0 0 28px -6px oklch(58% 0.215 27 / 0.55);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-next,
+  .step-prev,
+  .flash {
+    animation: none;
+  }
+}
+
+/* Number fields that have their own − and + buttons, or sit in a tight row, without the browser's spin arrows. */
+@layer utilities {
+  .no-spin {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  .no-spin::-webkit-inner-spin-button,
+  .no-spin::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
 /* Motion: a page arrives once; buttons step and press; nothing moves on scroll. */
 @layer utilities {
   .enter {
