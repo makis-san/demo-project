@@ -1,5 +1,10 @@
 import { getHistoryMovementsServerFn, getWorkoutHistoryServerFn, type HistoryCursor } from "@/lib/workouts.server";
-import { getMuscleLoadServerFn, getProgressionServerFn, getTrainingCalendarServerFn } from "@/lib/progression.server";
+import {
+  getMovementBestsServerFn,
+  getMuscleLoadServerFn,
+  getProgressionServerFn,
+  getTrainingCalendarServerFn,
+} from "@/lib/progression.server";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 // Starts every history key, so invalidating it refreshes the pages and the movement list together.
@@ -30,6 +35,15 @@ export const progressionQueryOptions = (movementId: string, timeZone: string) =>
   queryOptions({
     queryKey: [...progressionQueryKey, movementId, timeZone],
     queryFn: () => getProgressionServerFn({ data: { movementId } }),
+  });
+
+// The last top set and the best of several movements, for the current workout's hint and PR badges. Under the
+// progression key on purpose: everything that refreshes the charts (completing or deleting a workout, editing a set)
+// refreshes this too, with no second place to remember. The ids are sorted so the same movements always share a key.
+export const movementBestsQueryOptions = (movementIds: string[], timeZone: string) =>
+  queryOptions({
+    queryKey: [...progressionQueryKey, "bests", [...movementIds].sort(), timeZone],
+    queryFn: () => getMovementBestsServerFn({ data: { movementIds } }),
   });
 
 // Under the history key, so completing or deleting a workout refreshes it with the list. The timezone is in the

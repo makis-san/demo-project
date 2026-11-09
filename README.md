@@ -1,3 +1,5 @@
+> Write-ups for the stretch goals are in [docs/](docs/README.md).
+
 # Setlist
 
 **A no-nonsense strength training log.**
