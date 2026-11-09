@@ -16,8 +16,12 @@ export type JointName = "knee" | "hip" | "elbow" | "shoulder" | "ankle";
 export type PhaseKind = "setup" | "ecc" | "conc" | "hold" | "reset";
 export type Point = [number, number];
 
-/** The gear drawn with the figure. The bench goes behind it, the rest is held or stood on. */
-export type FigureGear = "barbell" | "pullbar" | "dipbars" | "step" | "none";
+/**
+ * The gear drawn with the figure. The bench goes behind it, the rest is held or stood on. "dumbbell" is a small weight
+ * in the hands, for a dumbbell, a kettlebell or a light bar. "pullbar" is a bar with a line up from it, so it also
+ * draws the handle of a high cable.
+ */
+export type FigureGear = "barbell" | "dumbbell" | "pullbar" | "dipbars" | "step" | "none";
 
 export type FigureDef = {
   root: RootJoint;
@@ -28,7 +32,7 @@ export type FigureDef = {
   /** Joint angles shown live while it moves. */
   read: JointName[];
   /** What the dashed line follows. The hands unless told otherwise. */
-  path?: "body" | "heel";
+  path?: "body" | "heel" | "hip";
   /** Whether the first half of the rep is lowering (eccentric) or lifting (concentric). */
   first: "ecc" | "conc";
   /** Two or three key poses, start to far end. */
@@ -248,11 +252,20 @@ export function frameOf(def: FigureDef): Frame {
     for (const p of Object.values(j)) pts.push(p);
     pts.push([j.head[0], j.head[1] + 0.13], [j.head[0], j.head[1] - 0.13], [j.head[0] + 0.13, j.head[1]]);
     if (def.gear === "barbell") pts.push([j.hand[0], j.hand[1] + 0.24], [j.hand[0], j.hand[1] - 0.24]);
+    if (def.gear === "dumbbell") pts.push([j.hand[0], j.hand[1] + 0.1], [j.hand[0], j.hand[1] - 0.1]);
     const tracked =
-      def.path === "heel" ? ([j.ankle[0] - 0.05, j.ankle[1]] as Point) : def.path === "body" ? j.shoulder : j.hand;
+      def.path === "heel"
+        ? ([j.ankle[0] - 0.05, j.ankle[1]] as Point)
+        : def.path === "body"
+          ? j.shoulder
+          : def.path === "hip"
+            ? j.hip
+            : j.hand;
     trail.push([tracked[0] * SCALE, -tracked[1] * SCALE]);
   }
   pts.push([0, 0]);
+  // The bench is drawn in place, so the camera keeps all of it in the picture.
+  if (def.bench) pts.push([-0.84, 0.48], [0.12, 0.48]);
   if (def.gear === "pullbar") pts.push([0, def.at[1] + 0.12]);
 
   let minX = Math.min(...pts.map((p) => p[0])) - 0.16;

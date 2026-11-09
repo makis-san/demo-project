@@ -72,7 +72,7 @@ function MovementPage() {
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-6">
-          {figure ? (
+          {figure && (
             <Card className="enter enter-1 p-3 sm:p-4">
               <MovementFigure
                 name={movement.name}
@@ -81,12 +81,6 @@ function MovementPage() {
                 secondary={movement.secondaryMuscles}
                 onStepChange={setStep}
               />
-            </Card>
-          ) : (
-            <Card className="enter enter-1 p-5 sm:p-7">
-              <p className="text-sm text-muted">
-                {movement.guide ? "No animation for this movement yet." : "No guide for a movement you created."}
-              </p>
             </Card>
           )}
           <YourNumbers movementId={movementId} timeZone={timeZone} />

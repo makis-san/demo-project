@@ -161,8 +161,11 @@ test.describe("Movement cards", () => {
     await expect(page).toHaveURL(/\/workout-library\/new/);
     // In the order they were ticked, each with its default series and rest, none lost.
     await expect(page.locator("[data-exercise]")).toHaveText([/Bench Press/, /Barbell Row/]);
-    await expect(page.getByLabel("Reps of set 1 of Barbell Row")).toHaveValue("10");
-    await expect(page.getByLabel("Rest after each set of Barbell Row, in seconds")).toHaveValue("60");
+    await page.getByRole("button", { name: "Next: Sets & rest" }).click();
+    await expect(page.getByLabel("Reps of every set of Barbell Row")).toHaveValue("10");
+    await expect(page.getByRole("button", { name: "Rest after each set of Barbell Row", exact: true })).toHaveText(
+      "1 min",
+    );
   });
 
   test("should open the movement from the card", async ({ page }) => {

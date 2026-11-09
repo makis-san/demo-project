@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 import { MovementThumb } from "@/components/movement-figure/movement-thumb";
 import { equipmentLabels, muscleLabels, type Equipment, type MuscleGroup } from "@/lib/muscles";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,7 @@ export function MovementCard({
   onToggle,
   highlight,
   onPick,
+  onInfo,
   children,
 }: {
   movement: MovementCardData;
@@ -47,6 +48,8 @@ export function MovementCard({
   selected?: boolean;
   onToggle?: () => void;
   highlight?: boolean;
+  /** Shows a details button that opens what the movement is and how it is done, without leaving the list. */
+  onInfo?: () => void;
   /** Extra text or a badge on the right, before the checkmark. */
   children?: React.ReactNode;
 }) {
@@ -95,6 +98,15 @@ export function MovementCard({
         </span>
       )}
       {children}
+      {onInfo && (
+        <button
+          type="button"
+          aria-label={`Details of ${movement.name}`}
+          onClick={onInfo}
+          className="press relative z-10 grid h-9 w-9 shrink-0 place-items-center rounded-full text-faint hover:bg-white/[0.08] hover:text-chalk">
+          <Info className="h-4 w-4" />
+        </button>
+      )}
       {selectable && (
         <button
           type="button"
