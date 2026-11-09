@@ -34,27 +34,72 @@ model Session {
   @@index([expiresAt])
 }
 
-model Movement {
-  id           String  @id @default(uuid())
-  userId       String
-  user         User    @relation(fields: [userId], references: [id])
-  name         String
-  // Pull-ups, push-ups and dips: the weight field starts at the user's body weight.
-  isBodyWeight Boolean @default(false)
-  sets         Set[]
+// The muscle groups a movement can train. Kept in step with src/lib/muscles.ts.
+enum MuscleGroup {
+  chest
+  shoulders
+  traps
+  lats
+  lower_back
+  biceps
+  triceps
+  forearms
+  abs
+  obliques
+  glutes
+  quads
+  hamstrings
+  calves
+}
 
+enum Equipment {
+  barbell
+  dumbbell
+  kettlebell
+  machine
+  cable
+  bodyweight
+  other
+}
+
+// A movement is either built in (userId is null, slug is set) or a custom one a user made (userId is set).
+// Sets point at this one table either way, so history, charts and PRs do not care which kind it is.
+model Movement {
+  id               String        @id @default(uuid())
+  // Null for a built-in movement, which every user can read and nobody can change.
+  userId           String?
+  // Restrict, not the default SetNull of an optional relation: deleting a user must never turn their movements into built-ins.
+  user             User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // The stable key of a built-in, from src/lib/movement-catalog.ts. The seed upserts on it.
+  slug             String?       @unique
+  name             String
+  // Pull-ups, push-ups and dips: the weight field starts at the user's body weight.
+  isBodyWeight     Boolean       @default(false)
+  equipment        Equipment?
+  primaryMuscles   MuscleGroup[] @default([])
+  secondaryMuscles MuscleGroup[] @default([])
+  sets             Set[]
+
+  // Postgres treats nulls as different, so this stops duplicate names among a user's own movements only.
+  // Built-in names are kept unique by a partial index in the movement_library migration, which Prisma cannot express.
   @@unique([userId, name])
 }
 
 model Workout {
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  id          String    @id @default(uuid())
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-  sets        Set[]
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  id              String    @id @default(uuid())
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  sets            Set[]
+  // The completed workout this one was started from ("Repeat this workout"). Its sets are the checklist of
+  // planned sets, not sets of this workout. Null when it was not started from another, or once that one is deleted.
+  sourceWorkoutId String?
+  sourceWorkout   Workout?  @relation("RepeatedWorkout", fields: [sourceWorkoutId], references: [id], onDelete: SetNull)
+  repeats         Workout[] @relation("RepeatedWorkout")
 
   @@index([userId, completedAt])
+  @@index([sourceWorkoutId])
 }
 
 model Set {

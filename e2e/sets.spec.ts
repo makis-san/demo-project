@@ -1,11 +1,9 @@
 import { test, expect, gotoApp, newTestUser, signUp } from "./fixtures";
 import { getDb } from "./db";
-import { addMovement, addSet, setRows, setTexts, startWorkout } from "./helpers";
+import { addMovement, addSet, selectMovement, setRows, setTexts, startWorkout } from "./helpers";
 
-// Every test starts with a signed-in user who has two movements and an active workout.
+// Every test starts with a signed-in user and an active workout. Bench Press and Back Squat are in the library.
 test.beforeEach(async ({ page }) => {
-  await addMovement(page, "Bench Press");
-  await addMovement(page, "Back Squat");
   await startWorkout(page);
 });
 
@@ -20,7 +18,6 @@ test.describe("Sets", () => {
 
     test("should require movement, weight, and reps to add a set", async ({ page }) => {
       const add = page.getByRole("button", { name: "Add", exact: true });
-      const movement = page.getByLabel("Movement");
       const weight = page.getByLabel("Weight");
       const reps = page.getByLabel("Reps");
 
@@ -31,7 +28,7 @@ test.describe("Sets", () => {
       await expect(add, "weight and reps without a movement").toBeDisabled();
 
       await weight.clear();
-      await movement.selectOption({ label: "Bench Press" });
+      await selectMovement(page, "Bench Press");
       await expect(add, "movement and reps without a weight").toBeDisabled();
 
       await reps.clear();
@@ -81,7 +78,10 @@ test.describe("Sets", () => {
 
       // Removing a set and adding another is what used to scramble the order,
       // because the database reuses the freed space and the list had no sort.
-      await setRows(page).filter({ hasText: "× 20 lbs" }).getByRole("button").click();
+      await setRows(page)
+        .filter({ hasText: "× 20 lbs" })
+        .getByRole("button", { name: /^Remove/ })
+        .click();
       await expect(setRows(page)).toHaveCount(4);
       await addSet(page, { movement: "Bench Press", weight: 60, reps: 5 });
 
@@ -137,11 +137,16 @@ test.describe("Sets", () => {
       await otherContext.close();
       const foreign = await getDb().movement.findFirstOrThrow({ where: { user: { email: other.email } } });
 
-      // The form only lists the user's own movements, so put the other one in the list the way an edited request would.
-      await page.getByLabel("Movement").evaluate((select, id) => {
-        select.append(new Option("Foreign", id));
-      }, foreign.id);
-      await page.getByLabel("Movement").selectOption({ label: "Foreign" });
+      // The menu only offers the user's own and the built-in movements, so swap the id in the request the way an
+      // edited request would.
+      const own = await getDb().movement.findFirstOrThrow({ where: { userId: null, name: "Bench Press" } });
+      await page.route("**/_serverFn/**", async (route) => {
+        const body = route.request().postData();
+        if (route.request().method() === "POST" && body?.includes(own.id)) {
+          await route.continue({ postData: body.replaceAll(own.id, foreign.id) });
+        } else await route.continue();
+      });
+      await selectMovement(page, "Bench Press");
       await page.getByLabel("Weight").fill("100");
       await page.getByLabel("Reps").fill("5");
       await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -188,7 +193,7 @@ test.describe("Sets", () => {
       await otherTab.getByRole("button", { name: "Complete Workout" }).click();
       await expect(otherTab.getByText("No active workout. Ready to start?")).toBeVisible();
 
-      await page.getByLabel("Movement").selectOption({ label: "Bench Press" });
+      await selectMovement(page, "Bench Press");
       await page.getByLabel("Weight").fill("100");
       await page.getByLabel("Reps").fill("7");
       await page.getByRole("button", { name: "Add", exact: true }).click();

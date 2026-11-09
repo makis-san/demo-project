@@ -1,5 +1,5 @@
 import { getHistoryMovementsServerFn, getWorkoutHistoryServerFn, type HistoryCursor } from "@/lib/workouts.server";
-import { getProgressionServerFn, getTrainingCalendarServerFn } from "@/lib/progression.server";
+import { getMuscleLoadServerFn, getProgressionServerFn, getTrainingCalendarServerFn } from "@/lib/progression.server";
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 // Starts every history key, so invalidating it refreshes the pages and the movement list together.
@@ -38,4 +38,12 @@ export const trainingCalendarQueryOptions = (timeZone: string) =>
   queryOptions({
     queryKey: [...workoutHistoryQueryKey, "calendar", timeZone],
     queryFn: () => getTrainingCalendarServerFn(),
+  });
+
+// Under the history key too, so completing, deleting or editing sets refreshes it. The timezone is in the key
+// because the 7-day window starts at the user's local midnight.
+export const muscleLoadQueryOptions = (timeZone: string) =>
+  queryOptions({
+    queryKey: [...workoutHistoryQueryKey, "muscles", timeZone],
+    queryFn: () => getMuscleLoadServerFn(),
   });

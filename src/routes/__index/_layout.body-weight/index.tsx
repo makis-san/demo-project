@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Check, Pencil, Plus, X, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StepButton, stepValue } from "@/components/stepper";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { LineChart } from "@/components/ui/line-chart";
-import { addBodyWeightServerFn, deleteBodyWeightServerFn } from "@/lib/body-weight.server";
+import { addBodyWeightServerFn, deleteBodyWeightServerFn, updateBodyWeightServerFn } from "@/lib/body-weight.server";
+import { bodyWeightSchema } from "@/lib/validation";
 import { chartDate, formatDate, shortDate } from "@/lib/dates";
 import { bodyWeightQueryOptions } from "./-queries/body-weight";
 import { weightUnit } from "@/lib/units";
@@ -47,6 +48,19 @@ function BodyWeightPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bodyWeightQueryOptions().queryKey });
     },
+  });
+
+  // The entry being edited in place, if any.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const updateMutation = useMutation({
+    mutationFn: async (input: { id: string; weight: number; recordedAt: Date }) => {
+      const result = await updateBodyWeightServerFn({ data: input });
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => setEditingId(null),
+    // Also after a refusal, so the list shows what the server has. The chart, the latest weight that
+    // body-weight movements start from and the stats all read this key.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: bodyWeightQueryOptions().queryKey }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -196,22 +210,42 @@ function BodyWeightPage() {
                 return (
                   <li
                     key={entry.id}
-                    className="flex items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-4 transition-colors hover:bg-white/[0.07]">
-                    <span className="num min-w-0 flex-1 text-lg font-bold text-chalk font-stretch-[90%]">
-                      {entry.weight} {weightUnit}
-                    </span>
-                    {delta !== null && <DeltaChip delta={delta} />}
-                    <span className="num w-24 shrink-0 text-right text-xs text-muted">
-                      {formatDate(entry.recordedAt, timeZone, shortDate)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Delete entry"
-                      onClick={() => deleteMutation.mutate(entry.id)}
-                      className="h-10 w-10 shrink-0 text-faint hover:text-danger">
-                      <X className="h-4 w-4" />
-                    </Button>
+                    className="flex flex-wrap items-center gap-3 rounded-2xl bg-well py-1.5 pr-1.5 pl-4 transition-colors hover:bg-white/[0.07]">
+                    {editingId === entry.id ? (
+                      <EntryEditor
+                        entry={entry}
+                        timeZone={timeZone}
+                        pending={updateMutation.isPending}
+                        onCancel={() => setEditingId(null)}
+                        onSave={(weight, recordedAt) => updateMutation.mutate({ id: entry.id, weight, recordedAt })}
+                      />
+                    ) : (
+                      <>
+                        <span className="num min-w-0 flex-1 text-lg font-bold text-chalk font-stretch-[90%]">
+                          {entry.weight} {weightUnit}
+                        </span>
+                        {delta !== null && <DeltaChip delta={delta} />}
+                        <span className="num w-24 shrink-0 text-right text-xs text-muted">
+                          {formatDate(entry.recordedAt, timeZone, shortDate)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Edit entry"
+                          onClick={() => setEditingId(entry.id)}
+                          className="h-10 w-10 shrink-0 text-faint hover:text-chalk">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete entry"
+                          onClick={() => deleteMutation.mutate(entry.id)}
+                          className="h-10 w-10 shrink-0 text-faint hover:text-danger">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </li>
                 );
               })}
@@ -238,5 +272,101 @@ function DeltaChip({ delta }: { delta: number }) {
       <Icon className="h-3 w-3" aria-hidden="true" />
       {numberFormat.format(Math.abs(delta))}
     </span>
+  );
+}
+
+/** The date as YYYY-MM-DD in a timezone, the value of a date field. */
+function dateInput(value: Date | string | number, timeZone: string) {
+  return new Date(value).toLocaleDateString("en-CA", { timeZone });
+}
+
+/**
+ * An entry's weight and date as fields, in place of its row. The weight follows the rules of adding one. The date
+ * keeps the time of day of the entry, so moving it to another day does not reorder two weigh-ins of the same day.
+ */
+function EntryEditor({
+  entry,
+  timeZone,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  entry: { weight: number; recordedAt: Date | string };
+  timeZone: string;
+  pending: boolean;
+  onSave: (weight: number, recordedAt: Date) => void;
+  onCancel: () => void;
+}) {
+  const [weight, setWeight] = useState(String(entry.weight));
+  const [day, setDay] = useState(dateInput(entry.recordedAt, timeZone));
+  const today = dateInput(Date.now(), timeZone);
+
+  const weightResult = bodyWeightSchema.safeParse(weight === "" ? NaN : Number(weight));
+  const error = !weightResult.success
+    ? `Weight: ${weightResult.error.issues[0]?.message ?? "invalid"}`
+    : !day || day > today
+      ? "The date can't be in the future"
+      : null;
+
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (error) return;
+    const original = new Date(entry.recordedAt);
+    // The same day keeps the entry exactly as it was, so editing the weight never moves it in the list.
+    if (day === dateInput(original, timeZone)) return onSave(Number(weight), original);
+    // Another day keeps the time of day of the original, in the browser's timezone, which is the one the page shows.
+    const [y, m, d] = day.split("-").map(Number);
+    const moved = new Date(
+      y,
+      m - 1,
+      d,
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds(),
+    );
+    // A weigh-in is already done: never later than now.
+    onSave(Number(weight), moved.getTime() > Date.now() ? new Date() : moved);
+  };
+
+  return (
+    <form onSubmit={save} className="min-w-0 flex-1 basis-full space-y-1.5 py-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="number"
+          aria-label="Edit weight"
+          inputMode="decimal"
+          min={0.01}
+          max={9999.99}
+          step="0.01"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          autoFocus
+          className="num h-11 w-28 text-center text-base"
+        />
+        <span className="text-sm text-muted">{weightUnit}</span>
+        <Input
+          type="date"
+          aria-label="Edit date"
+          value={day}
+          max={today}
+          onChange={(e) => setDay(e.target.value)}
+          className="num h-11 w-40 text-base"
+        />
+        <Button type="submit" size="icon" disabled={!!error || pending} aria-label="Save entry" className="h-11 w-11">
+          <Check className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label="Cancel edit"
+          onClick={onCancel}
+          className="h-11 w-11">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      {error && <p className="px-1 text-xs text-danger">{error}</p>}
+    </form>
   );
 }

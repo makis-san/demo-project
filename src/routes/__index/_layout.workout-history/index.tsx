@@ -1,12 +1,17 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { Fragment, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { formatDate, shortDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteWorkoutsServerFn } from "@/lib/workouts.server";
-import { Trash2 } from "lucide-react";
+import { deleteWorkoutsServerFn, repeatWorkoutServerFn } from "@/lib/workouts.server";
+import { ChevronRight, Repeat2, Trash2 } from "lucide-react";
+import { SetValues } from "@/components/set-values";
+import { cn } from "@/lib/utils";
+import { currentWorkoutQueryOptions } from "../_layout.current-workout/-queries/current-workout";
+import { MusclesWorked } from "./-muscles-worked";
 import {
   historyMovementsQueryOptions,
+  muscleLoadQueryOptions,
   progressionQueryKey,
   progressionQueryOptions,
   trainingCalendarQueryOptions,
@@ -15,7 +20,13 @@ import {
 } from "./-queries/workout-history";
 import { ProgressionChart } from "./-progression-chart";
 import { TrainingCalendar } from "./-training-calendar";
-import { useSuspenseInfiniteQuery, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useSuspenseInfiniteQuery,
+  useSuspenseQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { weightUnit } from "@/lib/units";
 import { PageHeader } from "@/components/page-header";
 
@@ -27,6 +38,7 @@ export const Route = createFileRoute("/__index/_layout/workout-history/")({
       context.queryClient.ensureInfiniteQueryData(workoutHistoryQueryOptions()),
       context.queryClient.ensureQueryData(historyMovementsQueryOptions()),
       context.queryClient.ensureQueryData(trainingCalendarQueryOptions(context.timeZone)),
+      context.queryClient.ensureQueryData(muscleLoadQueryOptions(context.timeZone)),
     ]);
     // Fetch the chart for the movement that is selected first, so it is in the server-rendered page.
     const first = movements[0];
@@ -46,12 +58,37 @@ function WorkoutHistoryPage() {
   // of the table are the same on every page, and the chart can pick any movement.
   const { data: movements } = useSuspenseQuery(historyMovementsQueryOptions());
   const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
+  // Workouts whose sets are open, to read or to correct a typo in them.
+  const [openWorkouts, setOpenWorkouts] = useState<Set<string>>(new Set());
+  const navigate = useNavigate();
+  // Only one workout can be active, so a repeat is offered only while there is none.
+  const { data: activeWorkout } = useQuery(currentWorkoutQueryOptions());
+  const hasActiveWorkout = !!activeWorkout;
+
+  const repeatMutation = useMutation({
+    mutationFn: async (workoutId: string) => {
+      const result = await repeatWorkoutServerFn({ data: { workoutId } });
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => navigate({ to: "/current-workout" }),
+    // Also after a refusal: the page may not know yet that a workout is open.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey }),
+  });
+
+  const toggleOpen = (id: string) =>
+    setOpenWorkouts((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const deleteWorkoutsMutation = useMutation({
     mutationFn: (workoutIds: string[]) => deleteWorkoutsServerFn({ data: { workoutIds } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workoutHistoryQueryKey });
       queryClient.invalidateQueries({ queryKey: progressionQueryKey });
+      // The active workout may be a repeat of one of these, and its checklist goes with the source.
+      queryClient.invalidateQueries({ queryKey: currentWorkoutQueryOptions().queryKey });
       setSelectedWorkouts(new Set());
     },
   });
@@ -87,6 +124,8 @@ function WorkoutHistoryPage() {
 
       <TrainingCalendar timeZone={timeZone} />
 
+      <MusclesWorked timeZone={timeZone} />
+
       {movements.length > 0 && (
         <ProgressionChart
           // Reset the selection if the chosen movement disappears, for example after deleting workouts.
@@ -114,6 +153,11 @@ function WorkoutHistoryPage() {
             </p>
           ) : (
             <>
+              {hasActiveWorkout && (
+                <p className="mb-3 px-1 text-xs text-faint">
+                  You have a workout in progress. Finish it to start a new one from a past workout.
+                </p>
+              )}
               <div className="-mx-2 overflow-x-auto rounded-2xl">
                 <table className="num w-full text-sm">
                   <thead>
@@ -146,46 +190,88 @@ function WorkoutHistoryPage() {
 
                       const isSelected = selectedWorkouts.has(workout.id);
                       return (
-                        <tr
-                          key={workout.id}
-                          className={`border-b border-line last:border-0 transition-colors ${isSelected ? "bg-primary/10" : "hover:bg-white/[0.04]"}`}>
-                          <td className="whitespace-nowrap px-3 py-3.5">
-                            <input
-                              type="checkbox"
-                              aria-label="Select workout"
-                              checked={selectedWorkouts.has(workout.id)}
-                              onChange={() => toggleWorkout(workout.id)}
-                              className="h-4 w-4 cursor-pointer"
-                            />
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3.5 font-medium text-chalk">
-                            {workout.completedAt ? formatDate(workout.completedAt, timeZone, shortDate) : "-"}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3.5 text-right text-muted">{workout.sets.length}</td>
-                          {movements.map(({ id: movementId }) => {
-                            const movementSets = setsByMovement.get(movementId);
-                            if (!movementSets || movementSets.length === 0) {
+                        <Fragment key={workout.id}>
+                          <tr
+                            className={`border-b border-line last:border-0 transition-colors ${isSelected ? "bg-primary/10" : "hover:bg-white/[0.04]"}`}>
+                            <td className="whitespace-nowrap px-3 py-3.5">
+                              <input
+                                type="checkbox"
+                                aria-label="Select workout"
+                                checked={selectedWorkouts.has(workout.id)}
+                                onChange={() => toggleWorkout(workout.id)}
+                                className="h-4 w-4 cursor-pointer"
+                              />
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3.5 font-medium text-chalk">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  aria-expanded={openWorkouts.has(workout.id)}
+                                  aria-label={`${openWorkouts.has(workout.id) ? "Hide" : "Show"} the sets of this workout`}
+                                  onClick={() => toggleOpen(workout.id)}
+                                  className="press grid h-8 w-8 shrink-0 place-items-center rounded-full text-faint hover:bg-white/[0.07] hover:text-chalk">
+                                  <ChevronRight
+                                    className={cn(
+                                      "h-4 w-4 transition-transform",
+                                      openWorkouts.has(workout.id) && "rotate-90",
+                                    )}
+                                  />
+                                </button>
+                                <span>
+                                  {workout.completedAt ? formatDate(workout.completedAt, timeZone, shortDate) : "-"}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label="Repeat this workout"
+                                  title={
+                                    hasActiveWorkout
+                                      ? "Finish your current workout first"
+                                      : "Start a new workout with these sets as a checklist"
+                                  }
+                                  disabled={hasActiveWorkout || workout.sets.length === 0 || repeatMutation.isPending}
+                                  onClick={() => repeatMutation.mutate(workout.id)}
+                                  className="press grid h-8 w-8 shrink-0 place-items-center rounded-full text-accent hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-30">
+                                  <Repeat2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3.5 text-right text-muted">
+                              {workout.sets.length}
+                            </td>
+                            {movements.map(({ id: movementId }) => {
+                              const movementSets = setsByMovement.get(movementId);
+                              if (!movementSets || movementSets.length === 0) {
+                                return (
+                                  <td
+                                    key={movementId}
+                                    className="whitespace-nowrap px-3 py-3.5 text-right text-faint/60">
+                                    -
+                                  </td>
+                                );
+                              }
+                              const maxWeight = Math.max(...movementSets.map((s) => s.weight));
+                              const avgReps = Math.round(
+                                movementSets.reduce((sum, s) => sum + s.reps, 0) / movementSets.length,
+                              );
+                              const numSets = movementSets.length;
                               return (
-                                <td key={movementId} className="whitespace-nowrap px-3 py-3.5 text-right text-faint/60">
-                                  -
+                                <td key={movementId} className="whitespace-nowrap px-3 py-3.5 text-right text-muted">
+                                  <span className="font-semibold text-chalk">
+                                    {maxWeight} {weightUnit}
+                                  </span>{" "}
+                                  / {avgReps} reps / {numSets} sets
                                 </td>
                               );
-                            }
-                            const maxWeight = Math.max(...movementSets.map((s) => s.weight));
-                            const avgReps = Math.round(
-                              movementSets.reduce((sum, s) => sum + s.reps, 0) / movementSets.length,
-                            );
-                            const numSets = movementSets.length;
-                            return (
-                              <td key={movementId} className="whitespace-nowrap px-3 py-3.5 text-right text-muted">
-                                <span className="font-semibold text-chalk">
-                                  {maxWeight} {weightUnit}
-                                </span>{" "}
-                                / {avgReps} reps / {numSets} sets
+                            })}
+                          </tr>
+                          {openWorkouts.has(workout.id) && (
+                            <tr className="border-b border-line last:border-0 bg-black/15">
+                              <td colSpan={movements.length + 3} className="px-3 py-3">
+                                <WorkoutSets sets={workout.sets} />
                               </td>
-                            );
-                          })}
-                        </tr>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -202,6 +288,40 @@ function WorkoutHistoryPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/** The sets of one completed workout, grouped by movement, each one editable in place. */
+function WorkoutSets({
+  sets,
+}: {
+  sets: { id: string; reps: number; weight: number; movement: { id: string; name: string } }[];
+}) {
+  if (sets.length === 0) return <p className="text-sm text-muted">This workout has no sets.</p>;
+  const groups: { name: string; id: string; sets: typeof sets }[] = [];
+  for (const set of sets) {
+    const group = groups.find((g) => g.id === set.movement.id);
+    if (group) group.sets.push(set);
+    else groups.push({ id: set.movement.id, name: set.movement.name, sets: [set] });
+  }
+  return (
+    <div className="space-y-3 text-sm" aria-label="Sets of this workout" role="group">
+      {groups.map((group) => (
+        <div key={group.id}>
+          <p className="px-1 pb-1 font-semibold text-muted">{group.name}</p>
+          <ul className="space-y-1">
+            {group.sets.map((set, i) => (
+              <li key={set.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-well py-1 pr-2 pl-3">
+                <span className="num w-11 shrink-0 text-xs font-semibold text-faint" aria-hidden="true">
+                  SET {i + 1}
+                </span>
+                <SetValues set={set} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

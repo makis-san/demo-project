@@ -4,6 +4,7 @@ import { authMiddleware } from "@/lib/auth.server";
 import { errorMiddleware } from "@/lib/errors.server";
 import { repsSchema, weightSchema } from "@/lib/validation";
 import { withNumberWeight } from "@/lib/sets.server";
+import { visibleMovements } from "@/lib/movements.server";
 import { z } from "zod";
 
 // createdAt alone can tie for sets added in the same millisecond, so id breaks the tie.
@@ -23,14 +24,31 @@ function findActiveWorkout(prisma: DbClient, userId: string) {
         include: { movement: true },
         orderBy: setOrder,
       },
+      // The workout this one was repeated from. Its sets are the checklist of planned sets.
+      sourceWorkout: {
+        select: {
+          id: true,
+          completedAt: true,
+          sets: { include: { movement: true }, orderBy: setOrder },
+        },
+      },
     },
   });
 }
 
 type ActiveWorkout = NonNullable<Awaited<ReturnType<typeof findActiveWorkout>>>;
 
-function toClientWorkout(workout: ActiveWorkout) {
-  return { ...workout, sets: workout.sets.map(withNumberWeight) };
+function toClientWorkout({ sourceWorkout, ...workout }: ActiveWorkout) {
+  return {
+    ...workout,
+    sets: workout.sets.map(withNumberWeight),
+    // Null for a workout that was not repeated from another, or whose source was deleted since.
+    plan: sourceWorkout && {
+      workoutId: sourceWorkout.id,
+      completedAt: sourceWorkout.completedAt,
+      sets: sourceWorkout.sets.map(withNumberWeight),
+    },
+  };
 }
 
 export const createWorkoutServerFn = createServerFn({ method: "POST" })
@@ -89,7 +107,7 @@ export const addSetServerFn = createServerFn({ method: "POST" })
         return { success: false as const, error: "No active workout" };
       }
       const movement = await prisma.movement.findFirst({
-        where: { id: data.movementId, userId: context.user.id },
+        where: { id: data.movementId, ...visibleMovements(context.user.id) },
         select: { id: true },
       });
       if (!movement) {
@@ -121,6 +139,62 @@ export const deleteSetServerFn = createServerFn({ method: "POST" })
       return { success: false as const, error: "Set not found" };
     }
     await prisma.set.delete({ where: { id: data.setId } });
+    return { success: true as const };
+  });
+
+/**
+ * Changes the weight and reps of a set, in the active workout or a completed one: a typo found later is still a typo.
+ * The movement and the place in the list stay (the order is `createdAt`, which is not touched). It checks the same
+ * rules as adding a set, and that the set is in one of the user's own workouts.
+ */
+export const updateSetServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware, authMiddleware])
+  .inputValidator(z.object({ setId: z.string(), reps: repsSchema, weight: weightSchema }))
+  .handler(
+    async ({
+      context,
+      data,
+    }: {
+      context: { user: { id: string } };
+      data: { setId: string; reps: number; weight: number };
+    }) => {
+      const prisma = await getServerSidePrismaClient();
+      // updateMany with the owner in the filter: another user's set is never touched, and a missing one is just count 0.
+      const { count } = await prisma.set.updateMany({
+        where: { id: data.setId, workout: { userId: context.user.id } },
+        data: { reps: data.reps, weight: data.weight },
+      });
+      if (count === 0) return { success: false as const, error: "Set not found" };
+      const set = await prisma.set.findUniqueOrThrow({ where: { id: data.setId }, include: { movement: true } });
+      return { success: true as const, set: withNumberWeight(set) };
+    },
+  );
+
+/**
+ * Starts a new workout from a completed one. The old workout's sets are not copied: they show up as planned sets
+ * (see `plan` in the active workout) that the user logs one by one, so a skipped one leaves no trace in history, charts
+ * or personal records. Only one workout can be active, so with one open this refuses and says so.
+ */
+export const repeatWorkoutServerFn = createServerFn({ method: "POST" })
+  .middleware([errorMiddleware, authMiddleware])
+  .inputValidator(z.object({ workoutId: z.string() }))
+  .handler(async ({ context, data }: { context: { user: { id: string } }; data: { workoutId: string } }) => {
+    const prisma = await getServerSidePrismaClient();
+    const source = await prisma.workout.findFirst({
+      where: { id: data.workoutId, userId: context.user.id, completedAt: { not: null } },
+      select: { id: true, _count: { select: { sets: true } } },
+    });
+    if (!source) return { success: false as const, error: "Workout not found" };
+    if (source._count.sets === 0) return { success: false as const, error: "That workout has no sets to repeat" };
+    try {
+      await prisma.workout.create({ data: { userId: context.user.id, sourceWorkoutId: source.id } });
+    } catch (error) {
+      // The unique index on active workouts says one is already open.
+      if (isUniqueViolation(error)) {
+        return { success: false as const, error: "Finish your current workout before starting another" };
+      }
+      throw error;
+    }
     return { success: true as const };
   });
 
@@ -187,10 +261,12 @@ export const getHistoryMovementsServerFn = createServerFn()
   .middleware([errorMiddleware, authMiddleware])
   .handler(async ({ context }) => {
     const prisma = await getServerSidePrismaClient();
+    // A built-in is shared, so its sets are filtered by the workout's owner too: another user's sets on the same
+    // built-in must not put it in this user's table.
     const movements = await prisma.movement.findMany({
       where: {
-        userId: context.user.id,
-        sets: { some: { workout: { completedAt: { not: null } } } },
+        ...visibleMovements(context.user.id),
+        sets: { some: { workout: { userId: context.user.id, completedAt: { not: null } } } },
       },
       select: { id: true, name: true },
     });

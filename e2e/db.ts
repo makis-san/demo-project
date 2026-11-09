@@ -51,7 +51,7 @@ export type SeedWorkout = {
 
 /**
  * Completed workouts made straight in the database. History shows 20 at a time, and completing that many
- * through the UI would make the test slow without testing anything more. Movements are created as needed.
+ * through the UI would make the test slow without testing anything more. Names that are in the library use the built-in movement, others are created as the user's own.
  * Returns the workout ids in the order given.
  */
 export async function seedCompletedWorkouts(email: string, workouts: SeedWorkout[]) {
@@ -60,11 +60,17 @@ export async function seedCompletedWorkouts(email: string, workouts: SeedWorkout
 
   const movementIds = new Map<string, string>();
   for (const name of new Set(workouts.flatMap((w) => (w.sets ?? []).map((s) => s.movement)))) {
-    const movement = await db.movement.upsert({
-      where: { userId_name: { userId: user.id, name } },
-      update: {},
-      create: { userId: user.id, name },
+    // A name from the library is the built-in movement, anything else becomes this user's own.
+    const builtIn = await db.movement.findFirst({
+      where: { userId: null, name: { equals: name, mode: "insensitive" } },
     });
+    const movement =
+      builtIn ??
+      (await db.movement.upsert({
+        where: { userId_name: { userId: user.id, name } },
+        update: {},
+        create: { userId: user.id, name },
+      }));
     movementIds.set(name, movement.id);
   }
 
