@@ -16,12 +16,9 @@ test.describe("Sets", () => {
       await expect(page.locator(".Toastify__toast")).toHaveCount(0);
     });
 
-    test("should show the set form only for a movement, and require weight and reps to add a set", async ({ page }) => {
-      // No movement picked: no form, no movement picker on the page, only the button to add one.
-      await expect(page.getByLabel("Weight")).toHaveCount(0);
-      await expect(page.getByLabel("Reps")).toHaveCount(0);
-      await expect(page.getByRole("combobox")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Add movement", exact: true })).toBeVisible();
+    test("should require movement, weight, and reps to add a set", async ({ page }) => {
+      // No movement picked: there is no form to add a set with.
+      await expect(page.getByRole("button", { name: "Add", exact: true })).toHaveCount(0);
 
       await selectMovement(page, "Bench Press");
       const add = page.getByRole("button", { name: "Add", exact: true });
@@ -41,6 +38,18 @@ test.describe("Sets", () => {
       await reps.clear();
       await weight.press("Enter");
       await expect(page.getByText("No sets yet")).toBeVisible();
+    });
+
+    test("should show the set form only for a movement", async ({ page }) => {
+      // No movement picked: no form, no movement picker on the page, only the button to add one.
+      await expect(page.getByLabel("Weight")).toHaveCount(0);
+      await expect(page.getByLabel("Reps")).toHaveCount(0);
+      await expect(page.getByRole("combobox")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Add movement", exact: true })).toBeVisible();
+
+      await selectMovement(page, "Bench Press");
+      await expect(page.getByLabel("Weight", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("Reps", { exact: true })).toBeVisible();
     });
 
     test("should display the new set in the workout", async ({ page }) => {

@@ -1,6 +1,6 @@
 import { test, expect, gotoApp } from "./fixtures";
 import { breakWrites, getDb } from "./db";
-import { addSet, completeWorkout, goTo, setRows, startWorkout } from "./helpers";
+import { addSet, completeWorkout, goTo, pressStart, setRows, startWorkout } from "./helpers";
 
 const noActiveWorkout = "No active workout. Ready to start?";
 
@@ -15,6 +15,18 @@ function fullDate(page: import("@playwright/test").Page, iso: string) {
 
 test.describe("Workouts", () => {
   test.describe("create", () => {
+    test("should start a new workout from the current workout page", async ({ page, user }) => {
+      await goTo(page, "Current Workout");
+      await expect(page.getByText(noActiveWorkout)).toBeVisible();
+
+      await page.getByRole("link", { name: "Empty workout" }).click();
+      await pressStart(page);
+
+      await expect(page.getByRole("button", { name: "Finish Workout" })).toBeVisible();
+      await expect(page.getByText(noActiveWorkout)).toHaveCount(0);
+      expect(await getDb().workout.count({ where: { user: { email: user.email }, completedAt: null } })).toBe(1);
+    });
+
     test("should not start a workout until Start is pressed", async ({ page, user }) => {
       await goTo(page, "Current Workout");
       await expect(page.getByText(noActiveWorkout)).toBeVisible();
